@@ -1,18 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-  <name>Elastichsearch Hadoop River</name>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<name>Elastichsearch HBase River</name>
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>org.elasticsearch</groupId>
-	<artifactId>rivers-hadoop</artifactId>
+	<artifactId>rivers-hbase</artifactId>
 	<packaging>jar</packaging>
-	<description>Hadoop River for ElasticSearch</description>
+	<description>HBase River for ElasticSearch</description>
 	<inceptionYear>2013</inceptionYear>
 	<version>1.0.0-SNAPSHOT</version>
 
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<elasticsearch.version>0.20.5</elasticsearch.version>
-		<hadoop.version>1.1.1</hadoop.version>
+		<hbase.version>0.94.3</hbase.version>
 
 		<mavenAssemblyPlugin>2.4</mavenAssemblyPlugin>
 		<mavenJarPluginVersion>2.4</mavenJarPluginVersion>
@@ -20,9 +21,9 @@
 	</properties>
 
 	<scm>
-		<url>scm:git://github.com/mallocator/Elasticsearch-MySQL-River.git</url>
-		<connection>scm:git://github.com/mallocator/Elasticsearch-MySQL-River.git</connection>
-		<developerConnection>scm:git://github.com/mallocator/Elasticsearch-MySQL-River.git</developerConnection>
+		<url>scm:git://github.com/mallocator/Elasticsearch-HBase-River.git</url>
+		<connection>scm:git://github.com/mallocator/Elasticsearch-HBase-River.git</connection>
+		<developerConnection>scm:git://github.com/mallocator/Elasticsearch-HBase-River.git</developerConnection>
 	</scm>
 
 	<dependencies>
@@ -33,9 +34,9 @@
 			<scope>provided</scope>
 		</dependency>
 		<dependency>
-			<groupId>org.apache.hadoop</groupId>
-			<artifactId>hadoop-core</artifactId>
-			<version>${hadoop.version}</version>
+			<groupId>org.apache.hbase</groupId>
+			<artifactId>hbase</artifactId>
+			<version>${hbase.version}</version>
 		</dependency>
 	</dependencies>
 	<build>

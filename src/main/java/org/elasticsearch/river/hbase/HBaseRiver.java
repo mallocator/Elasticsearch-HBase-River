@@ -1,10 +1,17 @@
 package org.elasticsearch.river.hbase;
 
+import java.lang.Thread.UncaughtExceptionHandler;
 import java.security.InvalidParameterException;
+import java.util.ArrayList;
 import java.util.Map;
 
 import org.elasticsearch.ElasticSearchException;
 import org.elasticsearch.ExceptionsHelper;
+import org.elasticsearch.action.ActionListener;
+import org.elasticsearch.action.bulk.BulkRequestBuilder;
+import org.elasticsearch.action.bulk.BulkResponse;
+import org.elasticsearch.action.index.IndexRequest;
+import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.client.Client;
 import org.elasticsearch.common.inject.Inject;
 import org.elasticsearch.common.util.concurrent.EsExecutors;
@@ -15,27 +22,47 @@ import org.elasticsearch.river.AbstractRiverComponent;
 import org.elasticsearch.river.River;
 import org.elasticsearch.river.RiverName;
 import org.elasticsearch.river.RiverSettings;
+import org.elasticsearch.search.facet.FacetBuilders;
+import org.elasticsearch.search.facet.statistical.StatisticalFacet;
+import org.hbase.async.HBaseClient;
+import org.hbase.async.KeyValue;
+import org.hbase.async.Scanner;
 
-public class HBaseRiver extends AbstractRiverComponent implements River {
+public class HBaseRiver extends AbstractRiverComponent implements River, UncaughtExceptionHandler {
 	private final Client	esClient;
+	private boolean			stopThread;
+	private volatile Thread	thread;
+
+	private final String	hosts;
+	private final String	table;
 	private final String	index;
 	private final String	type;
-	private volatile Thread	thread;
-	private boolean			stopThread;
-
-	private final boolean	deleteOldEntries;
 	private final long		interval;
+	private final int		batchSize;
+	private final String	idField;
 
 	@Inject
-	public HBaseRiver(RiverName riverName, RiverSettings settings, final Client esClient) {
+	public HBaseRiver(final RiverName riverName, final RiverSettings settings, final Client esClient) {
 		super(riverName, settings);
 		this.esClient = esClient;
 		this.logger.info("Creating MySQL Stream River");
 
+		this.hosts = readConfig("hosts", readConfig("zookeeper"));
+		this.table = readConfig("table");
+		this.idField = readConfig("idField", null);
 		this.index = readConfig("index", riverName.name());
 		this.type = readConfig("type", "data");
-		this.deleteOldEntries = Boolean.parseBoolean(readConfig("deleteOldEntries", "true"));
 		this.interval = Long.parseLong(readConfig("interval", "600000"));
+		this.batchSize = Integer.parseInt(readConfig("batchSize", "1000"));
+	}
+
+	private String readConfig(final String config) {
+		final String result = readConfig(config, null);
+		if (result == null) {
+			this.logger.error("Unable to read required config {}. Aborting!", config);
+			throw new InvalidParameterException("Unable to read required config " + config);
+		}
+		return result;
 	}
 
 	@SuppressWarnings({ "unchecked" })
@@ -50,13 +77,16 @@ public class HBaseRiver extends AbstractRiverComponent implements River {
 	@Override
 	public void start() {
 		this.logger.info("starting hbase stream");
+		String mapping;
+		if (this.idField == null) {
+			mapping = "{\"" + this.type + "\":{\"_timestamp\":{\"enabled\":true}}}";
+		}
+		else {
+			mapping = "{\"" + this.type + "\":{\"_timestamp\":{\"enabled\":true},\"_id\":{\"path\":\"" + this.idField + "\"}}}";
+		}
+
 		try {
-			this.esClient.admin()
-				.indices()
-				.prepareCreate(this.index)
-				.addMapping(this.type, "{\"" + this.type + "\":{\"_timestamp\":{\"enabled\":true}}}")
-				.execute()
-				.actionGet();
+			this.esClient.admin().indices().prepareCreate(this.index).addMapping(this.type, mapping).execute().actionGet();
 			this.logger.info("Created Index {} with _timestamp mapping for {}", this.index, this.type);
 		} catch (Exception e) {
 			if (ExceptionsHelper.unwrapCause(e) instanceof IndexAlreadyExistsException) {
@@ -76,7 +106,7 @@ public class HBaseRiver extends AbstractRiverComponent implements River {
 				.indices()
 				.preparePutMapping(this.index)
 				.setType(this.type)
-				.setSource("{\"" + this.type + "\":{\"_timestamp\":{\"enabled\":true}}}")
+				.setSource(mapping)
 				.setIgnoreConflicts(true)
 				.execute()
 				.actionGet();
@@ -86,6 +116,7 @@ public class HBaseRiver extends AbstractRiverComponent implements River {
 
 		if (this.thread == null) {
 			this.thread = EsExecutors.daemonThreadFactory(this.settings.globalSettings(), "hbase_slurper").newThread(new Parser());
+			this.thread.setUncaughtExceptionHandler(this);
 			this.thread.start();
 		}
 	}
@@ -97,7 +128,15 @@ public class HBaseRiver extends AbstractRiverComponent implements River {
 		this.thread = null;
 	}
 
-	private class Parser extends Thread {
+	@Override
+	public void uncaughtException(final Thread arg0, final Throwable arg1) {
+		this.logger.error("An Exception has been thrown in HBase Import Thread", arg1);
+		close();
+	}
+
+	private class Parser extends Thread implements ActionListener<BulkResponse> {
+		private int	indexCounter;
+
 		private Parser() {}
 
 		@Override
@@ -107,7 +146,11 @@ public class HBaseRiver extends AbstractRiverComponent implements River {
 			while (!HBaseRiver.this.stopThread) {
 				if (lastRun + HBaseRiver.this.interval < System.currentTimeMillis()) {
 					lastRun = System.currentTimeMillis();
-					parse();
+					try {
+						parse();
+					} catch (Exception e) {
+						HBaseRiver.this.logger.error("An exception has been caught while parsing data from HBase", e);
+					}
 					if (HBaseRiver.this.interval <= 0) {
 						break;
 					}
@@ -123,23 +166,61 @@ public class HBaseRiver extends AbstractRiverComponent implements River {
 			HBaseRiver.this.logger.info("HBase Import Thread has finished");
 		}
 
-		private void parse() {
-			final String timestamp = String.valueOf((int) (System.currentTimeMillis() / 1000));
-			
-			// TODO fetch data from Hbase according to settings
-			
-			if (HBaseRiver.this.deleteOldEntries) {
-				HBaseRiver.this.logger.info("Removing old Hbase entries from ElasticSearch!");
-				HBaseRiver.this.esClient.prepareDeleteByQuery(HBaseRiver.this.index)
-					.setTypes(HBaseRiver.this.type)
-					.setQuery(QueryBuilders.rangeQuery("_timestamp").lt(timestamp))
-					.execute()
-					.actionGet();
-				HBaseRiver.this.logger.info("Old HBase entries have been removed from ElasticSearch!");
+		private void parse() throws InterruptedException, Exception {
+			final HBaseClient client = new HBaseClient(HBaseRiver.this.hosts);
+			client.ensureTableExists(HBaseRiver.this.table);
+			final Scanner scanner = client.newScanner(HBaseRiver.this.table);
+			setMinTimestamp(scanner);
+
+			ArrayList<ArrayList<KeyValue>> rows;
+			while ((rows = scanner.nextRows(HBaseRiver.this.batchSize).join()) != null) {
+				final BulkRequestBuilder bulkRequest = HBaseRiver.this.esClient.prepareBulk();
+				for (final ArrayList<KeyValue> row : rows) {
+					final IndexRequest request = new IndexRequest(HBaseRiver.this.index, HBaseRiver.this.type);
+					for (final KeyValue column : row) {
+						final String key = String.valueOf(column.key());
+						final String value = String.valueOf(column.value());
+						request.source(key, value);
+					}
+					bulkRequest.add(request);
+				}
+				bulkRequest.execute().addListener((ActionListener<BulkResponse>) this);
 			}
-			else {
-				HBaseRiver.this.logger.info("Not removing old HBase entries from ElasticSearch");
+
+		}
+
+		private void setMinTimestamp(final Scanner scanner) {
+			final SearchResponse response = HBaseRiver.this.esClient.prepareSearch(HBaseRiver.this.index)
+				.setTypes(HBaseRiver.this.type)
+				.setQuery(QueryBuilders.matchAllQuery())
+				.addFacet(FacetBuilders.statisticalFacet("timestmap_stats").field("_timestamp"))
+				.execute()
+				.actionGet();
+
+			if (!response.facets().facets().isEmpty()) {
+				final StatisticalFacet facet = (StatisticalFacet) response.facets().facet("timestmap_stats");
+				scanner.setMinTimestamp((long) facet.getMax());
 			}
+		}
+
+		/**
+		 * Elasticsearch Response handler
+		 */
+		@Override
+		public void onResponse(final BulkResponse response) {
+			this.indexCounter += response.items().length;
+			HBaseRiver.this.logger.info("Indexed {} entries", this.indexCounter);
+			if (response.hasFailures()) {
+				HBaseRiver.this.logger.error("Errors have occured while trying to index new data from HBase");
+			}
+		}
+
+		/**
+		 * Elasticsearch Failure handler
+		 */
+		@Override
+		public void onFailure(final Throwable e) {
+			HBaseRiver.this.logger.error("An error has been caught while trying to index new data from HBase", e, new Object[] {});
 		}
 	}
 }

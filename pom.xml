@@ -13,7 +13,7 @@
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<elasticsearch.version>0.20.5</elasticsearch.version>
-		<hbase.version>0.94.3</hbase.version>
+		<hbase.async.version>1.4.1</hbase.async.version>
 
 		<mavenAssemblyPlugin>2.4</mavenAssemblyPlugin>
 		<mavenJarPluginVersion>2.4</mavenJarPluginVersion>
@@ -34,9 +34,9 @@
 			<scope>provided</scope>
 		</dependency>
 		<dependency>
-			<groupId>org.apache.hbase</groupId>
-			<artifactId>hbase</artifactId>
-			<version>${hbase.version}</version>
+			<groupId>org.hbase</groupId>
+			<artifactId>asynchbase</artifactId>
+			<version>${hbase.async.version}</version>
 		</dependency>
 	</dependencies>
 	<build>

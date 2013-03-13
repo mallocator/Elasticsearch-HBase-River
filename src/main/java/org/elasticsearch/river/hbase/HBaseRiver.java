@@ -186,9 +186,13 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
 				}
 				bulkRequest.execute().addListener((ActionListener<BulkResponse>) this);
 			}
-
 		}
 
+		/**
+		 * Sets the minimum time stamp on the HBase scanner, by looking into Elasticsearch for the last entry made.
+		 * 
+		 * @param scanner
+		 */
 		private void setMinTimestamp(final Scanner scanner) {
 			final SearchResponse response = HBaseRiver.this.esClient.prepareSearch(HBaseRiver.this.index)
 				.setTypes(HBaseRiver.this.type)
@@ -209,7 +213,7 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
 		@Override
 		public void onResponse(final BulkResponse response) {
 			this.indexCounter += response.items().length;
-			HBaseRiver.this.logger.info("Indexed {} entries", this.indexCounter);
+			HBaseRiver.this.logger.info("HBase imported has indexed {} entries so far", this.indexCounter);
 			if (response.hasFailures()) {
 				HBaseRiver.this.logger.error("Errors have occured while trying to index new data from HBase");
 			}

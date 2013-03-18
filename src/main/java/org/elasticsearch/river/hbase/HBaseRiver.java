@@ -37,14 +37,51 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
 	private final Client	esClient;
 	private volatile Thread	thread;
 
+	/**
+	 * Comma separated list of Zookeeper hosts to which the HBase client can connect to find the cluster.
+	 */
 	private final String	hosts;
+
+	/**
+	 * The HBase table name to be imported from.
+	 */
 	private final String	table;
+
+	/**
+	 * The ElasticSearch index name to be imported to. (default is the river name)
+	 */
 	private final String	index;
+
+	/**
+	 * The ElasticSearch type name to be imported to. (Default is the source table name)
+	 */
 	private final String	type;
+
+	/**
+	 * The interval in ms with which the river is supposed to run (60000 = every minute). (Default is every 10 minutes)
+	 */
 	private final long		interval;
+
+	/**
+	 * How big are the ElasticSearch bulk indexing sizes supposed to be. Tweaking this might improve performance. (Default is
+	 * 100 operations)
+	 */
 	private final int		batchSize;
+
+	/**
+	 * Name of the field from HBase to be used as an idField in ElasticSearch. The mapping will set up accordingly, so that
+	 * the _id field is routed to this field name (you can access it then under both the field name and "_id"). If no id
+	 * field is given, then ElasticSearch will automatically generate an id.
+	 */
 	private final String	idField;
 
+	/**
+	 * Loads and verifies all the configuration needed to run this river.
+	 * 
+	 * @param riverName
+	 * @param settings
+	 * @param esClient
+	 */
 	@Inject
 	public HBaseRiver(final RiverName riverName, final RiverSettings settings, final Client esClient) {
 		super(riverName, settings);
@@ -55,9 +92,9 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
 		this.table = readConfig("table");
 		this.idField = readConfig("idField", null);
 		this.index = readConfig("index", riverName.name());
-		this.type = readConfig("type", "data");
+		this.type = readConfig("type", this.table);
 		this.interval = Long.parseLong(readConfig("interval", "600000"));
-		this.batchSize = Integer.parseInt(readConfig("batchSize", "1000"));
+		this.batchSize = Integer.parseInt(readConfig("batchSize", "100"));
 
 		if (this.interval <= 0) {
 			throw new IllegalArgumentException("The interval between runs must be at least 1 ms. The current config is set to "
@@ -102,8 +139,8 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
 	}
 
 	/**
-	 * This method is launched by ElasticSearch and starts the HBase River. The method will try to create a mapping with
-	 * timestamps enabled. If a mapping already exists the user should make sure, that timestamps are enabled for this type.
+	 * This method is launched by ElasticSearch and starts the HBase River. The method will try to create a mapping with time
+	 * stamps enabled. If a mapping already exists the user should make sure, that time stamps are enabled for this type.
 	 */
 	@Override
 	public synchronized void start() {
@@ -187,6 +224,11 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
 		private Scanner				scanner;
 		private boolean				stopThread;
 
+		/**
+		 * Timing mechanism of the thread that determines when a parse operation is supposed to run. Waits for the predefined
+		 * interval until a new run is performed. The method checks every 1000ms if it should be parsing again. The first run
+		 * is done immediately once the thread is started.
+		 */
 		@Override
 		public void run() {
 			HBaseRiver.this.logger.info("HBase Import Thread has started");
@@ -213,6 +255,13 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
 			HBaseRiver.this.logger.info("HBase Import Thread has finished");
 		}
 
+		/**
+		 * The actual parse implementation that connects to the HBase cluster and fetches all rows since the last import.
+		 * Fetched rows are added to an ElasticSearch Bulk Request with a size according to batchSize (default is 100).
+		 * 
+		 * @throws InterruptedException
+		 * @throws Exception
+		 */
 		private void parse() throws InterruptedException, Exception {
 			HBaseRiver.this.logger.info("Parsing data from HBase");
 			this.client = new HBaseClient(HBaseRiver.this.hosts);
@@ -251,6 +300,9 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
 			}
 		}
 
+		/**
+		 * Checks if there is an open Scanner or Client and closes them.
+		 */
 		public synchronized void stopThread() {
 			this.stopThread = true;
 			if (this.scanner != null) {

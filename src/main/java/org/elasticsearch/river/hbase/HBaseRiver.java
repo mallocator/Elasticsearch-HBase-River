@@ -309,6 +309,9 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
 				final IndexRequestBuilder request = HBaseRiver.this.esClient.prepareIndex(HBaseRiver.this.index, HBaseRiver.this.type);
 				request.setTimestamp(timestamp);
 				request.setSource(readDataTree(row));
+				if (HBaseRiver.this.idField == null && row.size() > 0) {
+					request.setId(new String(row.get(0).key(), charset));
+				}
 				bulkRequest.add(request);
 			}
 			bulkRequest.execute().addListener((ActionListener<BulkResponse>) this);

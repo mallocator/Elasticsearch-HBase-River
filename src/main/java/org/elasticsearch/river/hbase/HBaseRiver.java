@@ -28,6 +28,11 @@ import org.hbase.async.HBaseClient;
 import org.hbase.async.KeyValue;
 import org.hbase.async.Scanner;
 
+/**
+ * An HBase import river build similar to the MySQL river, that was modeled after the Solr SQL import functionality.
+ * 
+ * @author Ravi Gairola
+ */
 public class HBaseRiver extends AbstractRiverComponent implements River, UncaughtExceptionHandler {
 	private final Client	esClient;
 	private volatile Thread	thread;
@@ -46,24 +51,47 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
 		this.esClient = esClient;
 		this.logger.info("Creating HBase Stream River");
 
-		this.hosts = readConfig("hosts", readConfig("zookeeper", null));
+		this.hosts = readConfig("hosts");
 		this.table = readConfig("table");
 		this.idField = readConfig("idField", null);
 		this.index = readConfig("index", riverName.name());
 		this.type = readConfig("type", "data");
 		this.interval = Long.parseLong(readConfig("interval", "600000"));
 		this.batchSize = Integer.parseInt(readConfig("batchSize", "1000"));
+
+		if (this.interval <= 0) {
+			throw new IllegalArgumentException("The interval between runs must be at least 1 ms. The current config is set to "
+					+ this.interval);
+		}
+		if (this.batchSize <= 0) {
+			throw new IllegalArgumentException("The batch size must be set to at least 1. The current config is set to " + this.batchSize);
+		}
 	}
 
+	/**
+	 * Fetch the value of a configuration that has no default value and is therefore mandatory. Empty (trimmed) strings are
+	 * as invalid as no value at all (null).
+	 * 
+	 * @param config Key of the configuration to fetch
+	 * @throws InvalidParameterException if a configuration is missing (null or empty)
+	 * @return
+	 */
 	private String readConfig(final String config) {
 		final String result = readConfig(config, null);
-		if (result == null) {
+		if (result == null || result.trim().isEmpty()) {
 			this.logger.error("Unable to read required config {}. Aborting!", config);
 			throw new InvalidParameterException("Unable to read required config " + config);
 		}
 		return result;
 	}
 
+	/**
+	 * Fetch the value of a configuration that has a default value and is therefore optional.
+	 * 
+	 * @param config Key of the configuration to fetch
+	 * @param defaultValue The value to set if no value could be found
+	 * @return
+	 */
 	@SuppressWarnings({ "unchecked" })
 	private String readConfig(final String config, final String defaultValue) {
 		if (this.settings.settings().containsKey("hbase")) {
@@ -73,6 +101,10 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
 		return defaultValue;
 	}
 
+	/**
+	 * This method is launched by ElasticSearch and starts the HBase River. The method will try to create a mapping with
+	 * timestamps enabled. If a mapping already exists the user should make sure, that timestamps are enabled for this type.
+	 */
 	@Override
 	public synchronized void start() {
 		if (this.thread != null) {
@@ -122,6 +154,10 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
 		this.thread.start();
 	}
 
+	/**
+	 * This method is called by ElasticSearch when shutting down the river. The method will stop the thread and close all
+	 * connections to HBase.
+	 */
 	@Override
 	public void close() {
 		this.logger.info("Closing HBase river");
@@ -129,20 +165,27 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
 		this.thread = null;
 	}
 
+	/**
+	 * Some of the asynchronous methods of the HBase client will throw Exceptions that are not caught anywhere else. If this
+	 * happens, the entire river is shut down.
+	 */
 	@Override
 	public void uncaughtException(final Thread arg0, final Throwable arg1) {
 		this.logger.error("An Exception has been thrown in HBase Import Thread", arg1, (Object[]) null);
 		close();
 	}
 
+	/**
+	 * A separate Thread that does the actual fetching and storing of data from an HBase cluster.
+	 * 
+	 * @author Ravi Gairola
+	 */
 	private class Parser extends Thread implements ActionListener<BulkResponse> {
 		private static final String	TIMESTMAP_STATS	= "timestamp_stats";
 		private int					indexCounter;
 		private HBaseClient			client;
 		private Scanner				scanner;
 		private boolean				stopThread;
-
-		private Parser() {}
 
 		@Override
 		public void run() {
@@ -156,9 +199,6 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
 					} catch (Exception e) {
 						HBaseRiver.this.logger.error("An exception has been caught while parsing data from HBase", e);
 					}
-					if (HBaseRiver.this.interval <= 0) {
-						break;
-					}
 					if (!this.stopThread) {
 						HBaseRiver.this.logger.info("HBase Import Thread is waiting for {} Seconds until the next run",
 							HBaseRiver.this.interval / 1000);
@@ -166,7 +206,9 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
 				}
 				try {
 					sleep(1000);
-				} catch (InterruptedException e) {}
+				} catch (InterruptedException e) {
+					HBaseRiver.this.logger.trace("HBase river parsing thread has been interrupted");
+				}
 			}
 			HBaseRiver.this.logger.info("HBase Import Thread has finished");
 		}
@@ -197,7 +239,7 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
 						final IndexRequestBuilder request = HBaseRiver.this.esClient.prepareIndex(HBaseRiver.this.index,
 							HBaseRiver.this.type);
 						for (final KeyValue column : row) {
-							request.setSource(column.key().toString(), column.value().toString());
+							request.setSource(new String(column.key()), new String(column.value()));
 						}
 						bulkRequest.add(request);
 					}
@@ -253,7 +295,7 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
 		}
 
 		/**
-		 * Elasticsearch Response handler
+		 * Elasticsearch Response handler.
 		 */
 		@Override
 		public void onResponse(final BulkResponse response) {
@@ -265,7 +307,7 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
 		}
 
 		/**
-		 * Elasticsearch Failure handler
+		 * Elasticsearch Failure handler.
 		 */
 		@Override
 		public void onFailure(final Throwable e) {

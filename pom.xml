@@ -14,6 +14,9 @@
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<elasticsearch.version>0.20.5</elasticsearch.version>
 		<hbase.async.version>1.4.1</hbase.async.version>
+		
+		<version.findbugs>2.5.2</version.findbugs>
+		<version.checkstyle>2.9.1</version.checkstyle>
 
 		<mavenAssemblyPlugin>2.4</mavenAssemblyPlugin>
 		<mavenJarPluginVersion>2.4</mavenJarPluginVersion>
@@ -85,6 +88,41 @@
 						<phase>package</phase>
 						<goals>
 							<goal>single</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>org.codehaus.mojo</groupId>
+				<artifactId>findbugs-maven-plugin</artifactId>
+				<version>${version.findbugs}</version>
+				<configuration>
+					<failOnError>false</failOnError>
+					<findbugsXmlOutput>true</findbugsXmlOutput>
+					<findbugsXmlWithMessages>true</findbugsXmlWithMessages>
+					<xmlOutput>true</xmlOutput>
+				</configuration>
+				<executions>
+					<execution>
+						<phase>install</phase>
+						<goals>
+							<goal>findbugs</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-checkstyle-plugin</artifactId>
+				<version>${version.checkstyle}</version>
+				<configuration>
+					<configLocation>${basedir}/checkstyle_include.xml</configLocation>
+				</configuration>
+				<executions>
+					<execution>
+						<phase>install</phase>
+						<goals>
+							<goal>checkstyle</goal>
 						</goals>
 					</execution>
 				</executions>

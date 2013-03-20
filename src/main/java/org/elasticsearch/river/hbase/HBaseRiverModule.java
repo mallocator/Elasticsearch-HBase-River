@@ -3,7 +3,13 @@ package org.elasticsearch.river.hbase;
 import org.elasticsearch.common.inject.AbstractModule;
 import org.elasticsearch.river.River;
 
-public class HBaseRiverModule  extends AbstractModule {
+/**
+ * Does the initial configuration of the Module, when it is called by ElasticSearch. Binds the HBase river as an eager
+ * singleton river.
+ * 
+ * @author Ravi Gairola
+ */
+public class HBaseRiverModule extends AbstractModule {
 
 	@Override
 	protected void configure() {

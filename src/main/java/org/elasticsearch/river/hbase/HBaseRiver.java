@@ -16,6 +16,7 @@ import org.elasticsearch.action.index.IndexRequestBuilder;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.client.Client;
 import org.elasticsearch.common.inject.Inject;
+import org.elasticsearch.common.util.concurrent.EsExecutors;
 import org.elasticsearch.common.xcontent.support.XContentMapValues;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.index.shard.IndexShardState;
@@ -31,14 +32,14 @@ import org.hbase.async.KeyValue;
 import org.hbase.async.Scanner;
 
 /**
- * An HBase import river build similar to the MySQL river, that was modeled after the Solr SQL import functionality.
+ * An HBase import river built similar to the MySQL river, that was modeled after the Solr SQL import functionality.
  * 
  * @author Ravi Gairola
  */
 public class HBaseRiver extends AbstractRiverComponent implements River, UncaughtExceptionHandler {
 	private static final String	CONFIG_SPACE	= "hbase";
 	private final Client		esClient;
-	private volatile Thread		parser;
+	private volatile Runnable	parser;
 
 	/**
 	 * Comma separated list of Zookeeper hosts to which the HBase client can connect to find the cluster.
@@ -173,7 +174,6 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
 			return;
 		}
 		this.parser = new Parser();
-		this.parser.setUncaughtExceptionHandler(this);
 
 		this.logger.info("Waiting for Index to be ready for interaction");
 		waitForESReady();
@@ -216,7 +216,9 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
 			this.logger.debug("Mapping already exists for index {} and type {}", this.index, this.type);
 		}
 
-		this.parser.start();
+		final Thread t = EsExecutors.daemonThreadFactory(this.settings.globalSettings(), "hbase_slurper").newThread(this.parser);
+		t.setUncaughtExceptionHandler(this);
+		t.start();
 	}
 
 	private void waitForESReady() {
@@ -263,7 +265,7 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
 	 * 
 	 * @author Ravi Gairola
 	 */
-	private class Parser extends Thread {
+	private class Parser implements Runnable {
 		private static final String	TIMESTMAP_STATS	= "timestamp_stats";
 		private int					indexCounter;
 		private HBaseClient			client;
@@ -294,7 +296,7 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
 					}
 				}
 				try {
-					sleep(1000);
+					Thread.sleep(1000);
 				} catch (InterruptedException e) {
 					HBaseRiver.this.logger.trace("HBase river parsing thread has been interrupted");
 				}
@@ -327,17 +329,16 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
 					}
 				}
 
-				final String timestamp = String.valueOf(setMinTimestamp(this.scanner));
-				HBaseRiver.this.logger.debug("Found latest timestamp in ElasticSearch to be {}", timestamp);
-
+				setMinTimestamp(this.scanner);
 				ArrayList<ArrayList<KeyValue>> rows;
 				HBaseRiver.this.logger.debug("Starting to fetch rows");
+
 				while ((rows = this.scanner.nextRows(HBaseRiver.this.batchSize).joinUninterruptibly()) != null) {
 					if (this.stopThread) {
 						HBaseRiver.this.logger.info("Stopping HBase import in the midle of it");
 						break;
 					}
-					parseBulkOfRows(timestamp, rows);
+					parseBulkOfRows(rows);
 				}
 			} finally {
 				HBaseRiver.this.logger.debug("Closing HBase Scanner and Async Client");
@@ -361,10 +362,9 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
 		/**
 		 * Run over a bulk of rows and process them.
 		 * 
-		 * @param timestamp
 		 * @param rows
 		 */
-		private void parseBulkOfRows(final String timestamp, final ArrayList<ArrayList<KeyValue>> rows) {
+		private void parseBulkOfRows(final ArrayList<ArrayList<KeyValue>> rows) {
 			HBaseRiver.this.logger.debug("Processing the next {} entries in HBase parsing process", rows.size());
 			final BulkRequestBuilder bulkRequest = HBaseRiver.this.esClient.prepareBulk();
 			for (final ArrayList<KeyValue> row : rows) {
@@ -439,10 +439,12 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
 				final StatisticalFacet facet = (StatisticalFacet) response.facets().facet(TIMESTMAP_STATS);
 				final long timestamp = (long) Math.max(facet.getMax(), 0);
 				scanner.setMinTimestamp(timestamp);
+				HBaseRiver.this.logger.debug("Found latest timestamp in ElasticSearch to be {}", timestamp);
 				return timestamp;
 			}
 			HBaseRiver.this.logger.debug("No statistical data about data timestamps could be found -> probably no data there yet");
 			scanner.setMinTimestamp(0);
+			HBaseRiver.this.logger.debug("Found latest timestamp in ElasticSearch to be not present (-> 0)");
 			return 0L;
 		}
 	}

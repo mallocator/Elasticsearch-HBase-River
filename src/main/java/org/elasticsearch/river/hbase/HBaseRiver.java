@@ -84,6 +84,17 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
 	private final Charset		charset;
 
 	/**
+	 * Limit the scanning of the HBase table to a certain family.
+	 */
+	public final byte[]			family;
+
+	/**
+	 * Limit the scanning of the HBase table to a number of qualifiers. A family must be set for this to take effect.
+	 * Multiple qualifiers can be set via comma separated list.
+	 */
+	public final String			qualifiers;
+
+	/**
 	 * Loads and verifies all the configuration needed to run this river.
 	 * 
 	 * @param riverName
@@ -104,6 +115,10 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
 		this.interval = Long.parseLong(readConfig("interval", "600000"));
 		this.batchSize = Integer.parseInt(readConfig("batchSize", "100"));
 		this.charset = Charset.forName(readConfig("charset", "UTF-8"));
+
+		final String family = readConfig("family", null);
+		this.family = family != null ? family.getBytes(this.charset) : null;
+		this.qualifiers = readConfig("qualifiers", null);
 
 		if (this.interval <= 0) {
 			throw new IllegalArgumentException("The interval between runs must be at least 1 ms. The current config is set to "
@@ -268,6 +283,7 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
 				if (lastRun + HBaseRiver.this.interval < System.currentTimeMillis()) {
 					lastRun = System.currentTimeMillis();
 					try {
+						this.indexCounter = 0;
 						parse();
 					} catch (Throwable t) {
 						HBaseRiver.this.logger.error("An exception has been caught while parsing data from HBase", t);
@@ -302,6 +318,14 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
 				HBaseRiver.this.logger.debug("Fetching HBase Scanner");
 				this.scanner = this.client.newScanner(HBaseRiver.this.table);
 				this.scanner.setServerBlockCache(false);
+				if (HBaseRiver.this.family != null) {
+					this.scanner.setFamily(HBaseRiver.this.family);
+				}
+				if (HBaseRiver.this.qualifiers != null) {
+					for (final String qualifier : HBaseRiver.this.qualifiers.split(",")) {
+						this.scanner.setQualifier(qualifier.trim().getBytes(HBaseRiver.this.charset));
+					}
+				}
 
 				final String timestamp = String.valueOf(setMinTimestamp(this.scanner));
 				HBaseRiver.this.logger.debug("Found latest timestamp in ElasticSearch to be {}", timestamp);

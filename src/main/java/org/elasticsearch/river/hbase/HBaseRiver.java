@@ -437,7 +437,7 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
 			if (response.facets().facet(TIMESTMAP_STATS) != null) {
 				HBaseRiver.this.logger.debug("Got statistical data from ElasticSearch about data timestamps");
 				final StatisticalFacet facet = (StatisticalFacet) response.facets().facet(TIMESTMAP_STATS);
-				final long timestamp = (long) Math.max(facet.getMax(), 0);
+				final long timestamp = (long) Math.max(facet.getMax() + 1, 0);
 				scanner.setMinTimestamp(timestamp);
 				HBaseRiver.this.logger.debug("Found latest timestamp in ElasticSearch to be {}", timestamp);
 				return timestamp;

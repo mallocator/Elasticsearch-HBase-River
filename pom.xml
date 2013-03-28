@@ -14,13 +14,16 @@
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<elasticsearch.version>0.20.5</elasticsearch.version>
 		<hbase.async.version>1.4.1</hbase.async.version>
-		
+
+		<version.testng>6.8</version.testng>
+		<version.jmockit>0.999.19</version.jmockit>
 		<version.findbugs>2.5.2</version.findbugs>
 		<version.checkstyle>2.9.1</version.checkstyle>
 
 		<mavenAssemblyPlugin>2.4</mavenAssemblyPlugin>
 		<mavenJarPluginVersion>2.4</mavenJarPluginVersion>
 		<mavenCompilerPlugin>3.0</mavenCompilerPlugin>
+		<version.maven.surefire>2.12</version.maven.surefire>
 	</properties>
 
 	<scm>
@@ -40,6 +43,21 @@
 			<groupId>org.hbase</groupId>
 			<artifactId>asynchbase</artifactId>
 			<version>${hbase.async.version}</version>
+		</dependency>
+		
+		<!-- Required for mocking during tests -->
+		<dependency>
+			<groupId>com.googlecode.jmockit</groupId>
+			<artifactId>jmockit</artifactId>
+			<version>${version.jmockit}</version>
+			<scope>test</scope>
+		</dependency>
+		<!-- Required for running next generation tests -->
+		<dependency>
+			<groupId>org.testng</groupId>
+			<artifactId>testng</artifactId>
+			<version>${version.testng}</version>
+			<scope>test</scope>
 		</dependency>
 	</dependencies>
 	<build>
@@ -93,6 +111,21 @@
 				</executions>
 			</plugin>
 			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<version>${version.maven.surefire}</version>
+				<configuration>
+					<argLine>-javaagent:"${settings.localRepository}"/com/googlecode/jmockit/jmockit/${version.jmockit}/jmockit-${version.jmockit}.jar -Xmx512m -XX:-UseSplitVerifier</argLine>
+					<forkMode>once</forkMode>
+					<properties>
+						<property>
+							<name>reporter</name>
+							<value>org.testng.reporters.XMLReporter</value>
+						</property>
+					</properties>
+				</configuration>
+			</plugin>
+			<plugin>
 				<groupId>org.codehaus.mojo</groupId>
 				<artifactId>findbugs-maven-plugin</artifactId>
 				<version>${version.findbugs}</version>
@@ -100,6 +133,7 @@
 					<failOnError>false</failOnError>
 					<findbugsXmlOutput>true</findbugsXmlOutput>
 					<findbugsXmlWithMessages>true</findbugsXmlWithMessages>
+					<excludeFilterFile>${basedir}/findbugs_exclude.xml</excludeFilterFile>
 					<xmlOutput>true</xmlOutput>
 				</configuration>
 				<executions>

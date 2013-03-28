@@ -15,7 +15,6 @@
 
 	<!-- Ignore unreachable code because of mocking -->
 	<Match>
-		<Class>mockit.MockUp.MockUp</Class>
 		<Bug pattern="UMAC_UNCALLABLE_METHOD_OF_ANONYMOUS_CLASS" />
 	</Match>
 </FindBugsFilter>

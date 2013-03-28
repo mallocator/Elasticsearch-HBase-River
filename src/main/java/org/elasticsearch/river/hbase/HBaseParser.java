@@ -184,21 +184,23 @@ class HBaseParser implements Runnable {
 	 */
 	@SuppressWarnings("unchecked")
 	protected void readQualifierStructure(final Map<String, Object> parent, final String qualifier, final String value) {
-		if (this.river.getColumnSeparator() == null || this.river.getColumnSeparator().isEmpty()) {
-			parent.put(qualifier, value);
-			return;
+		if (this.river.getColumnSeparator() != null && !this.river.getColumnSeparator().isEmpty()) {
+			final int separatorPos = qualifier.indexOf(this.river.getColumnSeparator());
+			if (separatorPos != -1) {
+				final String parentQualifier = qualifier.substring(0, separatorPos);
+				final String childQualifier = qualifier.substring(separatorPos + this.river.getColumnSeparator().length());
+				if (!childQualifier.isEmpty()) {
+					if (!(parent.get(parentQualifier) instanceof Map)) {
+						parent.put(parentQualifier, new HashMap<String, Object>());
+					}
+					readQualifierStructure((Map<String, Object>) parent.get(parentQualifier), childQualifier, value);
+					return;
+				}
+				parent.put(qualifier.replace(this.river.getColumnSeparator(), ""), value);
+				return;
+			}
 		}
-		final int separatorPos = qualifier.indexOf(this.river.getColumnSeparator());
-		if (separatorPos == -1) {
-			parent.put(qualifier, value);
-			return;
-		}
-		final String parentQualifier = qualifier.substring(0, separatorPos);
-		final String childQualifier = qualifier.substring(separatorPos + this.river.getColumnSeparator().length());
-		if (parent.get(parentQualifier) == null) {
-			parent.put(parentQualifier, new HashMap<String, Object>());
-		}
-		readQualifierStructure((Map<String, Object>) parent.get(parentQualifier), childQualifier, value);
+		parent.put(qualifier, value);
 	}
 
 	/**

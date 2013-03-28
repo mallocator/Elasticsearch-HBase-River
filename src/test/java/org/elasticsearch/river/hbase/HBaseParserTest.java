@@ -90,4 +90,44 @@ public class HBaseParserTest {
 		Assert.assertEquals(result.get("data::set2::category1"), "test4");
 		Assert.assertEquals(result.get("data::set2::category2"), "test5");
 	}
+
+	@SuppressWarnings("unchecked")
+	@Test
+	public void testReadQualifierStructureEmptySubQualifier() throws Exception {
+		this.separator = "::";
+
+		final Map<String, Object> result = new HashMap<String, Object>();
+		final HBaseParser parser = new HBaseParser(new HBaseRiver(null, null, null));
+		parser.readQualifierStructure(result, "data::set1::category1", "test1");
+		parser.readQualifierStructure(result, "data::set1::category2", "test2");
+		parser.readQualifierStructure(result, "data::set1::category3", "test3");
+		parser.readQualifierStructure(result, "data::set2::category1", "test4");
+		parser.readQualifierStructure(result, "data::set2::", "test5");
+
+		System.out.println(result);
+
+		Assert.assertEquals(((Map<String, Object>) ((Map<String, Object>) result.get("data")).get("set1")).get("category1"), "test1");
+		Assert.assertEquals(((Map<String, Object>) ((Map<String, Object>) result.get("data")).get("set1")).get("category2"), "test2");
+		Assert.assertEquals(((Map<String, Object>) ((Map<String, Object>) result.get("data")).get("set1")).get("category3"), "test3");
+		Assert.assertEquals(((Map<String, Object>) result.get("data")).get("set2"), "test5");
+	}
+
+	@Test
+	public void testReadQualifierStructureWrongSeperator() throws Exception {
+		this.separator = "--";
+
+		final Map<String, Object> result = new HashMap<String, Object>();
+		final HBaseParser parser = new HBaseParser(new HBaseRiver(null, null, null));
+		parser.readQualifierStructure(result, "data::set1::category1", "test1");
+		parser.readQualifierStructure(result, "data::set1::category2", "test2");
+		parser.readQualifierStructure(result, "data::set1::category3", "test3");
+		parser.readQualifierStructure(result, "data::set2::category1", "test4");
+		parser.readQualifierStructure(result, "data::set2::category2", "test5");
+
+		Assert.assertEquals(result.get("data::set1::category1"), "test1");
+		Assert.assertEquals(result.get("data::set1::category2"), "test2");
+		Assert.assertEquals(result.get("data::set1::category3"), "test3");
+		Assert.assertEquals(result.get("data::set2::category1"), "test4");
+		Assert.assertEquals(result.get("data::set2::category2"), "test5");
+	}
 }

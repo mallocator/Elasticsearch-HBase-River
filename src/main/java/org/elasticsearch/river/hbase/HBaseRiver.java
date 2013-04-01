@@ -300,7 +300,7 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
 	 * @return
 	 */
 	public String normalizeField(final String fieldName) {
-		if (!isNormalizeFields()) {
+		if (!isNormalizeFields() || fieldName == null) {
 			return fieldName;
 		}
 		return fieldName.toLowerCase().replaceAll("[^a-z0-9\\-_]*", "");

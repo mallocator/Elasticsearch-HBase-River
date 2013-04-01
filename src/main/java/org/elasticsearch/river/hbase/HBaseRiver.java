@@ -76,13 +76,20 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
 	/**
 	 * Limit the scanning of the HBase table to a certain family.
 	 */
-	public final byte[]			family;
+	private final byte[]		family;
 
 	/**
 	 * Limit the scanning of the HBase table to a number of qualifiers. A family must be set for this to take effect.
 	 * Multiple qualifiers can be set via comma separated list.
 	 */
-	public final String			qualifiers;
+	private final String		qualifiers;
+
+	/**
+	 * Some names must be given in a lower case format (the index name for example), others are more flexible. This flag will
+	 * normalize all fields to lower case and remove special characters that ELastichsearch can't handle. (The filter is
+	 * probably stricter than needed in most cases)
+	 */
+	private final boolean		normalizeFields;
 
 	/**
 	 * Splits up the column into further sub columns if a separator is defined. For example:
@@ -101,6 +108,8 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
 	 * 	}
 	 * }
 	 * </pre>
+	 * 
+	 * If no separator is defined, or the separator is empty, no operation is performed.
 	 */
 	public final String			columnSeparator;
 
@@ -117,12 +126,13 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
 		this.esClient = esClient;
 		this.logger.info("Creating HBase Stream River");
 
+		this.normalizeFields = Boolean.parseBoolean(readConfig("normalizeFields", "true"));
 		this.hosts = readConfig("hosts");
 		this.table = readConfig("table");
-		this.idField = readConfig("idField", null);
 		this.columnSeparator = readConfig("columnSeparator", null);
-		this.index = readConfig("index", riverName.name());
-		this.type = readConfig("type", this.table);
+		this.idField = normalizeField(readConfig("idField", null));
+		this.index = normalizeField(readConfig("index", riverName.name()));
+		this.type = normalizeField(readConfig("type", this.table));
 		this.interval = Long.parseLong(readConfig("interval", "600000"));
 		this.batchSize = Integer.parseInt(readConfig("batchSize", "100"));
 		this.charset = Charset.forName(readConfig("charset", "UTF-8"));
@@ -268,6 +278,24 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
 	@Override
 	public void uncaughtException(final Thread arg0, final Throwable arg1) {
 		this.logger.error("An Exception has been thrown in HBase Import Thread", arg1, (Object[]) null);
+	}
+
+	/**
+	 * If the normalizeField flag is set, this method will return a lower case representation of the field, as well as
+	 * stripping away all special characters except "-" and "_".
+	 * 
+	 * @param fieldName
+	 * @return
+	 */
+	public String normalizeField(final String fieldName) {
+		if (!isNormalizeFields()) {
+			return fieldName;
+		}
+		return fieldName.toLowerCase().replaceAll("[^a-z0-9\\-_]*", "");
+	}
+
+	public boolean isNormalizeFields() {
+		return this.normalizeFields;
 	}
 
 	public long getInterval() {

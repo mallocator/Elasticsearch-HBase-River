@@ -164,7 +164,7 @@ class HBaseParser implements Runnable {
 	protected Map<String, Object> readDataTree(final ArrayList<KeyValue> row) {
 		final Map<String, Object> dataTree = new HashMap<String, Object>();
 		for (final KeyValue column : row) {
-			final String family = new String(column.family(), this.river.getCharset());
+			final String family = this.river.normalizeField(new String(column.family(), this.river.getCharset()));
 			final String qualifier = new String(column.qualifier(), this.river.getCharset());
 			final String value = new String(column.value(), this.river.getCharset());
 			if (!dataTree.containsKey(family)) {
@@ -187,7 +187,7 @@ class HBaseParser implements Runnable {
 		if (this.river.getColumnSeparator() != null && !this.river.getColumnSeparator().isEmpty()) {
 			final int separatorPos = qualifier.indexOf(this.river.getColumnSeparator());
 			if (separatorPos != -1) {
-				final String parentQualifier = qualifier.substring(0, separatorPos);
+				final String parentQualifier = this.river.normalizeField(qualifier.substring(0, separatorPos));
 				final String childQualifier = qualifier.substring(separatorPos + this.river.getColumnSeparator().length());
 				if (!childQualifier.isEmpty()) {
 					if (!(parent.get(parentQualifier) instanceof Map)) {
@@ -196,11 +196,11 @@ class HBaseParser implements Runnable {
 					readQualifierStructure((Map<String, Object>) parent.get(parentQualifier), childQualifier, value);
 					return;
 				}
-				parent.put(qualifier.replace(this.river.getColumnSeparator(), ""), value);
+				parent.put(this.river.normalizeField(qualifier.replace(this.river.getColumnSeparator(), "")), value);
 				return;
 			}
 		}
-		parent.put(qualifier, value);
+		parent.put(this.river.normalizeField(qualifier), value);
 	}
 
 	/**

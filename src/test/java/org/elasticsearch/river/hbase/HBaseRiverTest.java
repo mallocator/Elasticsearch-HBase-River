@@ -38,5 +38,6 @@ public class HBaseRiverTest {
 		Assert.assertEquals(river.normalizeField("a_b"), "a_b");
 		Assert.assertEquals(river.normalizeField("90aS"), "90as");
 		Assert.assertEquals(river.normalizeField("&*($@#!ui^&$(#:\"8ui"), "ui8ui");
+		Assert.assertEquals(river.normalizeField(null), null);
 	}
 }

@@ -1,24 +1,25 @@
 package org.elasticsearch.river.hbase;
 
+import java.nio.charset.Charset;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
 import mockit.Mock;
 import mockit.MockUp;
+import mockit.Mockit;
 
 import org.elasticsearch.client.Client;
 import org.elasticsearch.river.AbstractRiverComponent;
 import org.elasticsearch.river.RiverName;
 import org.elasticsearch.river.RiverSettings;
+import org.hbase.async.KeyValue;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 public class HBaseParserTest {
-	public class ReadDataTreeTest {
-
-	}
-
 	public class ReadQualifierStructureTest {
 		public String	separator;
 		public boolean	normalize;
@@ -45,9 +46,14 @@ public class HBaseParserTest {
 			};
 		}
 
+		@AfterClass
+		public void tearDown() {
+			Mockit.tearDownMocks();
+		}
+
 		@SuppressWarnings("unchecked")
 		@Test
-		public void testReadQualifierStructure() throws Exception {
+		public void testBase() throws Exception {
 			this.separator = "::";
 			this.normalize = false;
 
@@ -67,7 +73,7 @@ public class HBaseParserTest {
 		}
 
 		@Test
-		public void testReadQualifierStructureNullSeperator() throws Exception {
+		public void testNullSeperator() throws Exception {
 			this.separator = null;
 			this.normalize = false;
 
@@ -87,7 +93,7 @@ public class HBaseParserTest {
 		}
 
 		@Test
-		public void testReadQualifierStructureEmptySeperator() throws Exception {
+		public void testEmptySeperator() throws Exception {
 			this.separator = "";
 			this.normalize = false;
 
@@ -108,7 +114,7 @@ public class HBaseParserTest {
 
 		@SuppressWarnings("unchecked")
 		@Test
-		public void testReadQualifierStructureEmptySubQualifier() throws Exception {
+		public void testEmptySubQualifier() throws Exception {
 			this.separator = "::";
 			this.normalize = true;
 
@@ -129,7 +135,7 @@ public class HBaseParserTest {
 		}
 
 		@Test
-		public void testReadQualifierStructureWrongSeperator() throws Exception {
+		public void testWrongSeperator() throws Exception {
 			this.separator = "--";
 			this.normalize = false;
 
@@ -147,6 +153,79 @@ public class HBaseParserTest {
 			Assert.assertEquals(result.get("data::set1::category3"), "test3");
 			Assert.assertEquals(result.get("dataset2category1"), "test4");
 			Assert.assertEquals(result.get("dataset2category2"), "test5");
+		}
+	}
+
+	public class ReadDataTreeTest {
+		private final Charset	charset		= Charset.forName("UTF-8");
+		private int				rowCounter	= 0;
+
+		@BeforeClass
+		public void setUp() {
+			new MockUp<AbstractRiverComponent>() {
+				@Mock
+				void $init(final RiverName riverName, final RiverSettings settings) {}
+			};
+
+			new MockUp<HBaseRiver>() {
+
+				@Mock
+				void $init(final RiverName riverName, final RiverSettings settings, final Client esClient) {}
+
+				@Mock
+				Charset getCharset() {
+					return ReadDataTreeTest.this.charset;
+				}
+
+				@Mock
+				boolean isNormalizeFields() {
+					return true;
+				}
+			};
+		}
+
+		@AfterClass
+		public void tearDown() {
+			Mockit.tearDownMocks();
+		}
+
+		@Test
+		@SuppressWarnings("unchecked")
+		public void testBase() {
+			final HBaseParser parser = new HBaseParser(new HBaseRiver(null, null, null));
+
+			final ArrayList<KeyValue> input = new ArrayList<KeyValue>();
+
+			input.add(getKeyValue("family1", "category1", "value1"));
+			input.add(getKeyValue("family1", "category2", "value2"));
+			input.add(getKeyValue("family1", "category3", "value3"));
+			input.add(getKeyValue("family2", "category1", "value4"));
+			input.add(getKeyValue("family2", "category4", "value5"));
+			input.add(getKeyValue("family3", "category5", "value6"));
+			input.add(getKeyValue("family2", "category6", "value7"));
+
+			final Map<String, Object> output = parser.readDataTree(input);
+
+			Assert.assertNotNull(output.get("family1"));
+			final Map<String, Object> family1 = (Map<String, Object>) output.get("family1");
+			Assert.assertEquals(family1.get("category1"), "value1");
+			Assert.assertEquals(family1.get("category2"), "value2");
+			Assert.assertEquals(family1.get("category3"), "value3");
+			Assert.assertNotNull(output.get("family2"));
+			final Map<String, Object> family2 = (Map<String, Object>) output.get("family2");
+			Assert.assertEquals(family2.get("category1"), "value4");
+			Assert.assertEquals(family2.get("category4"), "value5");
+			Assert.assertEquals(family2.get("category6"), "value7");
+			Assert.assertNotNull(output.get("family3"));
+			final Map<String, Object> family3 = (Map<String, Object>) output.get("family3");
+			Assert.assertEquals(family3.get("category5"), "value6");
+		}
+
+		private KeyValue getKeyValue(final String family, final String qualifier, final String value) {
+			return new KeyValue(String.valueOf(this.rowCounter++).getBytes(this.charset),
+				family.getBytes(this.charset),
+				qualifier.getBytes(this.charset),
+				value.getBytes(this.charset));
 		}
 	}
 }

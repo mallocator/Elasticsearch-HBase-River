@@ -114,6 +114,12 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
 	public final String			columnSeparator;
 
 	/**
+	 * Define a custom mapping that will be used instead of an automatically generated one. Make sure to enable time stamps
+	 * and if you want an id-field to be recognized set the proper alias.
+	 */
+	public final String			customMapping;
+
+	/**
 	 * Loads and verifies all the configuration needed to run this river.
 	 * 
 	 * @param riverName
@@ -140,6 +146,7 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
 		final String family = readConfig("family", null);
 		this.family = family != null ? family.getBytes(this.charset) : null;
 		this.qualifiers = readConfig("qualifiers", null);
+		this.customMapping = readConfig("customMapping", null);
 
 		if (this.interval <= 0) {
 			throw new IllegalArgumentException("The interval between runs must be at least 1 ms. The current config is set to "
@@ -200,11 +207,16 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
 
 		this.logger.info("Starting HBase Stream");
 		String mapping;
-		if (this.idField == null) {
-			mapping = "{\"" + this.type + "\":{\"_timestamp\":{\"enabled\":true}}}";
+		if (this.customMapping != null && !this.customMapping.trim().isEmpty()) {
+			mapping = this.customMapping;
 		}
 		else {
-			mapping = "{\"" + this.type + "\":{\"_timestamp\":{\"enabled\":true},\"_id\":{\"path\":\"" + this.idField + "\"}}}";
+			if (this.idField == null) {
+				mapping = "{\"" + this.type + "\":{\"_timestamp\":{\"enabled\":true}}}";
+			}
+			else {
+				mapping = "{\"" + this.type + "\":{\"_timestamp\":{\"enabled\":true},\"_id\":{\"path\":\"" + this.idField + "\"}}}";
+			}
 		}
 
 		try {

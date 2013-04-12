@@ -86,7 +86,7 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
 
 	/**
 	 * Some names must be given in a lower case format (the index name for example), others are more flexible. This flag will
-	 * normalize all fields to lower case and remove special characters that ELastichsearch can't handle. (The filter is
+	 * normalize all fields to lower case and remove special characters that ELasticSearch can't handle. (The filter is
 	 * probably stricter than needed in most cases)
 	 */
 	private final boolean		normalizeFields;

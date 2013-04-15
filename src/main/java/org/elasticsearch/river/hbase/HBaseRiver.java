@@ -120,6 +120,11 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
 	public final String			customMapping;
 
 	/**
+	 * Setting if old entries that have just been read from HBase should be deleted after they've been read.
+	 */
+	private final boolean		deleteOld;
+
+	/**
 	 * Loads and verifies all the configuration needed to run this river.
 	 * 
 	 * @param riverName
@@ -142,6 +147,7 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
 		this.interval = Long.parseLong(readConfig("interval", "600000"));
 		this.batchSize = Integer.parseInt(readConfig("batchSize", "100"));
 		this.charset = Charset.forName(readConfig("charset", "UTF-8"));
+		this.deleteOld = Boolean.parseBoolean(readConfig("deleteOld", "false"));
 
 		final String family = readConfig("family", null);
 		this.family = family != null ? family.getBytes(this.charset) : null;
@@ -360,5 +366,9 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
 
 	public ESLogger getLogger() {
 		return this.logger;
+	}
+
+	public boolean getDeleteOld() {
+		return this.deleteOld;
 	}
 }

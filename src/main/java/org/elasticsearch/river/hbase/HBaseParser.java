@@ -12,6 +12,7 @@ import org.elasticsearch.common.logging.ESLogger;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.search.facet.FacetBuilders;
 import org.elasticsearch.search.facet.statistical.StatisticalFacet;
+import org.hbase.async.DeleteRequest;
 import org.hbase.async.HBaseClient;
 import org.hbase.async.KeyValue;
 import org.hbase.async.Scanner;
@@ -136,12 +137,16 @@ class HBaseParser implements Runnable {
 			}
 			if (row.size() > 0) {
 				final IndexRequestBuilder request = this.river.getEsClient().prepareIndex(this.river.getIndex(), this.river.getType());
+				final byte[] key = row.get(0).key();
 				request.setSource(readDataTree(row));
 				request.setTimestamp(String.valueOf(row.get(0).timestamp()));
 				if (this.river.getIdField() == null) {
-					request.setId(new String(row.get(0).key(), this.river.getCharset()));
+					request.setId(new String(key, this.river.getCharset()));
 				}
 				bulkRequest.add(request);
+				if (this.river.getDeleteOld()) {
+					this.client.delete(new DeleteRequest(this.river.getTable().getBytes(), key));
+				}
 			}
 		}
 		final BulkResponse response = bulkRequest.execute().actionGet();

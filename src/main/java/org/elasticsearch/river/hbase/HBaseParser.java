@@ -23,17 +23,19 @@ import org.hbase.async.Scanner;
  * @author Ravi Gairola
  */
 class HBaseParser implements Runnable {
-	private static final String	TIMESTMAP_STATS	= "timestamp_stats";
-	private final HBaseRiver	river;
-	private final ESLogger		logger;
-	private int					indexCounter;
-	private HBaseClient			client;
-	private Scanner				scanner;
-	private boolean				stopThread;
+	private static final String			TIMESTMAP_STATS	= "timestamp_stats";
+	private final HBaseRiver			river;
+	private final ESLogger				logger;
+	private final HBaseCallbackLogger	cbLogger;
+	private int							indexCounter;
+	private HBaseClient					client;
+	private Scanner						scanner;
+	private boolean						stopThread;
 
 	HBaseParser(final HBaseRiver river) {
 		this.river = river;
 		this.logger = river.getLogger();
+		this.cbLogger = new HBaseCallbackLogger(this.logger, "HBase Parser");
 	}
 
 	/**
@@ -79,7 +81,7 @@ class HBaseParser implements Runnable {
 		try {
 			this.client = new HBaseClient(this.river.getHosts());
 			this.logger.debug("Checking if table {} actually exists in HBase DB", this.river.getTable());
-			this.client.ensureTableExists(this.river.getTable());
+			this.client.ensureTableExists(this.river.getTable()).addErrback(this.cbLogger);
 			this.logger.debug("Fetching HBase Scanner");
 			this.scanner = this.client.newScanner(this.river.getTable());
 			this.scanner.setServerBlockCache(false);
@@ -96,7 +98,7 @@ class HBaseParser implements Runnable {
 			ArrayList<ArrayList<KeyValue>> rows;
 			this.logger.debug("Starting to fetch rows");
 
-			while ((rows = this.scanner.nextRows(this.river.getBatchSize()).joinUninterruptibly()) != null) {
+			while ((rows = this.scanner.nextRows(this.river.getBatchSize()).addErrback(this.cbLogger).joinUninterruptibly()) != null) {
 				if (this.stopThread) {
 					this.logger.info("Stopping HBase import in the midle of it");
 					break;
@@ -107,14 +109,14 @@ class HBaseParser implements Runnable {
 			this.logger.debug("Closing HBase Scanner and Async Client");
 			if (this.scanner != null) {
 				try {
-					this.scanner.close();
+					this.scanner.close().addErrback(this.cbLogger);
 				} catch (Exception e) {
 					this.logger.error("An Exception has been caught while closing the HBase Scanner", e, (Object[]) null);
 				}
 			}
 			if (this.client != null) {
 				try {
-					this.client.shutdown();
+					this.client.shutdown().addErrback(this.cbLogger);
 				} catch (Exception e) {
 					this.logger.error("An Exception has been caught while shuting down the HBase client", e, (Object[]) null);
 				}
@@ -145,7 +147,7 @@ class HBaseParser implements Runnable {
 				}
 				bulkRequest.add(request);
 				if (this.river.getDeleteOld()) {
-					this.client.delete(new DeleteRequest(this.river.getTable().getBytes(), key));
+					this.client.delete(new DeleteRequest(this.river.getTable().getBytes(), key)).addErrback(this.cbLogger);
 				}
 			}
 		}

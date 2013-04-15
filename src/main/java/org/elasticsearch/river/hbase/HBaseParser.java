@@ -2,8 +2,11 @@ package org.elasticsearch.river.hbase;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 
+import org.elasticsearch.action.bulk.BulkItemResponse;
 import org.elasticsearch.action.bulk.BulkRequestBuilder;
 import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.action.index.IndexRequestBuilder;
@@ -23,17 +26,19 @@ import org.hbase.async.Scanner;
  * @author Ravi Gairola
  */
 class HBaseParser implements Runnable {
-	private static final String	TIMESTMAP_STATS	= "timestamp_stats";
-	private final HBaseRiver	river;
-	private final ESLogger		logger;
-	private int					indexCounter;
-	private HBaseClient			client;
-	private Scanner				scanner;
-	private boolean				stopThread;
+	private static final String			TIMESTMAP_STATS	= "timestamp_stats";
+	private final HBaseRiver			river;
+	private final ESLogger				logger;
+	private final HBaseCallbackLogger	cbLogger;
+	private int							indexCounter;
+	private HBaseClient					client;
+	private Scanner						scanner;
+	private boolean						stopThread;
 
 	HBaseParser(final HBaseRiver river) {
 		this.river = river;
 		this.logger = river.getLogger();
+		this.cbLogger = new HBaseCallbackLogger(this.logger, "HBase Parser");
 	}
 
 	/**
@@ -79,7 +84,7 @@ class HBaseParser implements Runnable {
 		try {
 			this.client = new HBaseClient(this.river.getHosts());
 			this.logger.debug("Checking if table {} actually exists in HBase DB", this.river.getTable());
-			this.client.ensureTableExists(this.river.getTable());
+			this.client.ensureTableExists(this.river.getTable()).addErrback(this.cbLogger);
 			this.logger.debug("Fetching HBase Scanner");
 			this.scanner = this.client.newScanner(this.river.getTable());
 			this.scanner.setServerBlockCache(false);
@@ -96,7 +101,7 @@ class HBaseParser implements Runnable {
 			ArrayList<ArrayList<KeyValue>> rows;
 			this.logger.debug("Starting to fetch rows");
 
-			while ((rows = this.scanner.nextRows(this.river.getBatchSize()).joinUninterruptibly()) != null) {
+			while ((rows = this.scanner.nextRows(this.river.getBatchSize()).addErrback(this.cbLogger).joinUninterruptibly()) != null) {
 				if (this.stopThread) {
 					this.logger.info("Stopping HBase import in the midle of it");
 					break;
@@ -107,14 +112,14 @@ class HBaseParser implements Runnable {
 			this.logger.debug("Closing HBase Scanner and Async Client");
 			if (this.scanner != null) {
 				try {
-					this.scanner.close();
+					this.scanner.close().addErrback(this.cbLogger);
 				} catch (Exception e) {
 					this.logger.error("An Exception has been caught while closing the HBase Scanner", e, (Object[]) null);
 				}
 			}
 			if (this.client != null) {
 				try {
-					this.client.shutdown();
+					this.client.shutdown().addErrback(this.cbLogger);
 				} catch (Exception e) {
 					this.logger.error("An Exception has been caught while shuting down the HBase client", e, (Object[]) null);
 				}
@@ -130,6 +135,7 @@ class HBaseParser implements Runnable {
 	protected void parseBulkOfRows(final ArrayList<ArrayList<KeyValue>> rows) {
 		this.logger.debug("Processing the next {} entries in HBase parsing process", rows.size());
 		final BulkRequestBuilder bulkRequest = this.river.getEsClient().prepareBulk();
+		final Map<String, byte[]> keyMapForDeletion = new HashMap<String, byte[]>();
 		for (final ArrayList<KeyValue> row : rows) {
 			if (this.stopThread) {
 				this.logger.info("Stopping HBase import in the midle of it");
@@ -138,24 +144,53 @@ class HBaseParser implements Runnable {
 			if (row.size() > 0) {
 				final IndexRequestBuilder request = this.river.getEsClient().prepareIndex(this.river.getIndex(), this.river.getType());
 				final byte[] key = row.get(0).key();
-				request.setSource(readDataTree(row));
+				final Map<String, Object> dataTree = readDataTree(row);
+				request.setSource(dataTree);
 				request.setTimestamp(String.valueOf(row.get(0).timestamp()));
 				if (this.river.getIdField() == null) {
-					request.setId(new String(key, this.river.getCharset()));
+					final String keyString = new String(key, this.river.getCharset());
+					request.setId(keyString);
+					keyMapForDeletion.put(keyString, key);
+				}
+				else {
+					final String keyString = findKeyInDataTree(dataTree, this.river.getIdField());
+					keyMapForDeletion.put(keyString, key);
 				}
 				bulkRequest.add(request);
-				if (this.river.getDeleteOld()) {
-					this.client.delete(new DeleteRequest(this.river.getTable().getBytes(), key));
-				}
 			}
 		}
 		final BulkResponse response = bulkRequest.execute().actionGet();
 
 		this.indexCounter += response.items().length;
 		this.logger.info("HBase river has indexed {} entries so far", this.indexCounter);
+		final List<byte[]> failedKeys = new ArrayList<byte[]>();
 		if (response.hasFailures()) {
+			for (BulkItemResponse r : response.items()) {
+				if (r.failed()) {
+					failedKeys.add(keyMapForDeletion.remove(r.getId()));
+				}
+			}
 			this.logger.error("Errors have occured while trying to index new data from HBase");
+			this.logger.debug("Failed keys are {}", failedKeys);
 		}
+		if (this.river.getDeleteOld()) {
+			for (Entry<String, byte[]> keyEntry : keyMapForDeletion.entrySet()) {
+				this.client.delete(new DeleteRequest(this.river.getTable().getBytes(), keyEntry.getValue())).addErrback(this.cbLogger);
+			}
+		}
+	}
+
+	@SuppressWarnings("unchecked")
+	protected String findKeyInDataTree(final Map<String, Object> dataTree, final String keyPath) {
+		if (!keyPath.contains(this.river.getColumnSeparator())) {
+			return (String) dataTree.get(keyPath);
+		}
+		final String key = keyPath.substring(0, keyPath.indexOf(this.river.getColumnSeparator()));
+		if (dataTree.get(key) instanceof Map) {
+			final int subKeyIndex = keyPath.indexOf(this.river.getColumnSeparator()) + this.river.getColumnSeparator().length();
+			return findKeyInDataTree((Map<String, Object>) dataTree.get(key), keyPath.substring(subKeyIndex));
+		}
+		return null;
 	}
 
 	/**

@@ -25,6 +25,11 @@ public class HBaseRiverTest {
 			boolean isNormalizeFields() {
 				return true;
 			}
+
+			@Mock
+			String getColumnSeparator() {
+				return "::";
+			}
 		};
 
 		final HBaseRiver river = new HBaseRiver(null, null, null);
@@ -37,7 +42,8 @@ public class HBaseRiverTest {
 		Assert.assertEquals(river.normalizeField("a-b"), "a-b");
 		Assert.assertEquals(river.normalizeField("a_b"), "a_b");
 		Assert.assertEquals(river.normalizeField("90aS"), "90as");
-		Assert.assertEquals(river.normalizeField("&*($@#!ui^&$(#:\"8ui"), "ui8ui");
+		Assert.assertEquals(river.normalizeField("&*($@#!ui^&$(#\"8ui"), "ui8ui");
+		Assert.assertEquals(river.normalizeField("bl%^&*ah::blubb"), "blah::blubb");
 		Assert.assertEquals(river.normalizeField(null), null);
 	}
 }

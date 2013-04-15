@@ -1,5 +1,8 @@
 package org.elasticsearch.river.hbase;
 
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -20,6 +23,11 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 public class HBaseParserTest {
+	@AfterClass
+	public void tearDown() {
+		Mockit.tearDownMocks();
+	}
+
 	public class ReadQualifierStructureTest {
 		public String	separator;
 		public boolean	normalize;
@@ -44,11 +52,6 @@ public class HBaseParserTest {
 					return ReadQualifierStructureTest.this.normalize;
 				}
 			};
-		}
-
-		@AfterClass
-		public void tearDown() {
-			Mockit.tearDownMocks();
 		}
 
 		@SuppressWarnings("unchecked")
@@ -184,11 +187,6 @@ public class HBaseParserTest {
 			};
 		}
 
-		@AfterClass
-		public void tearDown() {
-			Mockit.tearDownMocks();
-		}
-
 		@Test
 		@SuppressWarnings("unchecked")
 		public void testBase() {
@@ -206,19 +204,19 @@ public class HBaseParserTest {
 
 			final Map<String, Object> output = parser.readDataTree(input);
 
-			Assert.assertNotNull(output.get("family1"));
+			assertNotNull(output.get("family1"));
 			final Map<String, Object> family1 = (Map<String, Object>) output.get("family1");
-			Assert.assertEquals(family1.get("category1"), "value1");
-			Assert.assertEquals(family1.get("category2"), "value2");
-			Assert.assertEquals(family1.get("category3"), "value3");
-			Assert.assertNotNull(output.get("family2"));
+			assertEquals(family1.get("category1"), "value1");
+			assertEquals(family1.get("category2"), "value2");
+			assertEquals(family1.get("category3"), "value3");
+			assertNotNull(output.get("family2"));
 			final Map<String, Object> family2 = (Map<String, Object>) output.get("family2");
-			Assert.assertEquals(family2.get("category1"), "value4");
-			Assert.assertEquals(family2.get("category4"), "value5");
-			Assert.assertEquals(family2.get("category6"), "value7");
-			Assert.assertNotNull(output.get("family3"));
+			assertEquals(family2.get("category1"), "value4");
+			assertEquals(family2.get("category4"), "value5");
+			assertEquals(family2.get("category6"), "value7");
+			assertNotNull(output.get("family3"));
 			final Map<String, Object> family3 = (Map<String, Object>) output.get("family3");
-			Assert.assertEquals(family3.get("category5"), "value6");
+			assertEquals(family3.get("category5"), "value6");
 		}
 
 		private KeyValue getKeyValue(final String family, final String qualifier, final String value) {
@@ -226,6 +224,61 @@ public class HBaseParserTest {
 				family.getBytes(this.charset),
 				qualifier.getBytes(this.charset),
 				value.getBytes(this.charset));
+		}
+	}
+
+	public class FindKeyInDataTreeTest {
+		protected String	separator;
+		protected boolean	normalize;
+
+		@BeforeClass
+		public void setUp() {
+			new MockUp<AbstractRiverComponent>() {
+				@Mock
+				void $init(final RiverName riverName, final RiverSettings settings) {}
+			};
+
+			new MockUp<HBaseRiver>() {
+
+				@Mock
+				void $init(final RiverName riverName, final RiverSettings settings, final Client esClient) {}
+
+				@Mock
+				String getColumnSeparator() {
+					return FindKeyInDataTreeTest.this.separator;
+				}
+
+				@Mock
+				boolean isNormalizeFields() {
+					return FindKeyInDataTreeTest.this.normalize;
+				}
+			};
+		}
+
+		@Test
+		public void testBase() {
+			final HBaseParser parser = new HBaseParser(new HBaseRiver(null, null, null));
+			this.separator = "::";
+
+			final Map<String, Object> dataTree = new HashMap<String, Object>();
+			final Map<String, Object> dataBranch = new HashMap<String, Object>();
+			dataBranch.put("theId", "TheValue");
+			dataTree.put("aBranch", dataBranch);
+
+			assertEquals(parser.findKeyInDataTree(dataTree, "aBranch::theId"), "TheValue");
+		}
+
+		@Test
+		public void testDotSeparator() {
+			final HBaseParser parser = new HBaseParser(new HBaseRiver(null, null, null));
+			this.separator = ".";
+
+			final Map<String, Object> dataTree = new HashMap<String, Object>();
+			final Map<String, Object> dataBranch = new HashMap<String, Object>();
+			dataBranch.put("theId", "TheValue");
+			dataTree.put("aBranch", dataBranch);
+
+			assertEquals(parser.findKeyInDataTree(dataTree, "aBranch.theId"), "TheValue");
 		}
 	}
 }

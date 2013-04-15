@@ -109,7 +109,9 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
 	 * }
 	 * </pre>
 	 * 
-	 * If no separator is defined, or the separator is empty, no operation is performed.
+	 * If no separator is defined, or the separator is empty, no operation is performed. Try to use single character
+	 * separators, as multi character separators will allow partial hits of a separator to be part of the data. (e.g. A
+	 * separator defined as "()" will leave all "(" and ")" in the parsed data.
 	 */
 	public final String			columnSeparator;
 
@@ -220,6 +222,10 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
 			if (this.idField == null) {
 				mapping = "{\"" + this.type + "\":{\"_timestamp\":{\"enabled\":true}}}";
 			}
+			if (this.columnSeparator != null) {
+				mapping = "{\"" + this.type + "\":{\"_timestamp\":{\"enabled\":true},\"_id\":{\"path\":\""
+						+ this.idField.replace(this.columnSeparator, ".") + "\"}}}";
+			}
 			else {
 				mapping = "{\"" + this.type + "\":{\"_timestamp\":{\"enabled\":true},\"_id\":{\"path\":\"" + this.idField + "\"}}}";
 			}
@@ -309,7 +315,14 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
 		if (!isNormalizeFields() || fieldName == null) {
 			return fieldName;
 		}
-		return fieldName.toLowerCase().replaceAll("[^a-z0-9\\-_]*", "");
+		if (getColumnSeparator() != null) {
+			String regex = "a-z0-9\\-_";
+			for (int i = 0; i < getColumnSeparator().length(); i++) {
+				regex += "\\" + getColumnSeparator().charAt(i);
+			}
+			return fieldName.toLowerCase().replaceAll("[^" + regex + "]", "");
+		}
+		return fieldName.toLowerCase().replaceAll("[^a-z0-9\\-_]", "");
 	}
 
 	public boolean isNormalizeFields() {

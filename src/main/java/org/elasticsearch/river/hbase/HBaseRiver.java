@@ -266,7 +266,7 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
 	}
 
 	private void waitForESReady() {
-		if (!this.esClient.admin().indices().prepareExists(this.index).execute().actionGet().exists()) {
+		if (!this.esClient.admin().indices().prepareExists(this.index).execute().actionGet().isExists()) {
 			return;
 		}
 		for (final ShardStatus status : this.esClient.admin().indices().prepareStatus(this.index).execute().actionGet().getShards()) {

@@ -1,5 +1,6 @@
 package org.elasticsearch.river.hbase;
 
+import java.io.IOException;
 import java.lang.Thread.UncaughtExceptionHandler;
 import java.nio.charset.Charset;
 import java.security.InvalidParameterException;
@@ -208,9 +209,14 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
 			this.logger.warn("Trying to start HBase stream although it is already running");
 			return;
 		}
-		this.parser = new HBaseParser(this);
+    try {
+      this.parser = new HBaseParser(this);
+    } catch (IOException e) {
+      this.logger.error("Parser through exception");
+      System.exit(-1);
+    }
 
-		this.logger.info("Waiting for Index to be ready for interaction");
+    this.logger.info("Waiting for Index to be ready for interaction");
 		waitForESReady();
 
 		this.logger.info("Starting HBase Stream");

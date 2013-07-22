@@ -16,7 +16,7 @@ JSON=$(cat <<EOF
 EOF
 )
 
-curl -XDELETE 127.0.0.1:9200/_river/river-mysql
+curl -XDELETE 127.0.0.1:9200/_river/river-hbase
 echo
-curl -XPUT 127.0.0.1:9200/_river/river-mysql/_meta -d "$JSON"
+curl -XPUT 127.0.0.1:9200/_river/river-hbase/_meta -d "$JSON"
 echo

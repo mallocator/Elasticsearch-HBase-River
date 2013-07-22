@@ -6,8 +6,8 @@ JSON=$(cat <<EOF
     "hbase":{
     	"index":"elasticSearchIndexName",
         "type":"elasticSearchTypeName",
-        "hosts":"zookeeperHostnames",
-        "table":"hbaseTableName",
+        "hosts":"localhost:2180",
+        "table":"t1",
         "batchSize":1000,
         "idField":"PrimaryKeyFieldName",
         "interval":"60000"

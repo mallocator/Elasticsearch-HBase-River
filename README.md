@@ -1,7 +1,11 @@
 Elasticsearch-HBase-River
 ==========================
 
-An import river similar to the elasticsearch mysql river
+This is a fork of the Elasticsearch-HBase-River 
+https://github.com/mallocator/Elasticsearch-HBase-River
+This one is slightly different in that it uses replication feature already in 
+HBase. http://hbase.apache.org/replication.html. The plugin updates HBase's
+zookeeper cluster to direct HBase to send WAL edits to the elastic search plugin. It is currently not in production and doesn't support deletes, and updates.
 
 If you're looking for an alternative sollution that uses the core hbase libraries and uses hbase replication for moving data, you can find one here:
 https://github.com/posix4e/Elasticsearch-HBase-River

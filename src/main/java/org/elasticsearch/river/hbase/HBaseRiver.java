@@ -209,14 +209,8 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
 			this.logger.warn("Trying to start HBase stream although it is already running");
 			return;
 		}
-    try {
-      this.parser = new HBaseParser(this);
-    } catch (IOException e) {
-      this.logger.error("Parser through exception");
-      System.exit(-1);
-    }
-
-    this.logger.info("Waiting for Index to be ready for interaction");
+    this.parser = new HBaseParser(this);
+   this.logger.info("Waiting for Index to be ready for interaction");
 		waitForESReady();
 
 		this.logger.info("Starting HBase Stream");
@@ -296,9 +290,6 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
 	@Override
 	public synchronized void close() {
 		this.logger.info("Closing HBase river");
-		if (this.parser instanceof HBaseParser) {
-			((HBaseParser) this.parser).stopThread();
-		}
 		this.parser = null;
 	}
 

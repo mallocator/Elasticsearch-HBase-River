@@ -48,123 +48,86 @@ class HBaseParser extends UnimplementedInHRegionShim
     RegionServerServices {
 
   private final InetSocketAddress initialIsa;
-  private final RpcServer rpcServer;
-  private final RpcEngine rpcEngine;
+  private final String ZK_CONNECT_STRING = "localhost:2181";
+  private final String ZK_ROOT = "/hbase.o";
+  private final String HBASE_ID = "hbaseid";
+  private final String MAGIC_ID = "1374084687099";
+  private final String RS = "rs";
   private HBaseServer server;
   ZooKeeper zooKeeper;
   Configuration c;
 
   final static int PORT_NUMBER = 8080;
   final static String hostname = "localhost";
-  private static final String TIMESTMAP_STATS = "timestamp_stats";
   private final HBaseRiver river;
   private final ESLogger logger;
   private int indexCounter;
-  private boolean stopThread;
+  int numHandler;
+  int metaHandlerCount;
+  boolean verbose;
 
-  HBaseParser(final HBaseRiver river) throws IOException {
+  HBaseParser(final HBaseRiver river) {
     this.river = river;
     this.logger = river.getLogger();
-    zooKeeper = new ZooKeeper("localhost:2181", 300, this);
-    c = HBaseConfiguration.create();
-
     initialIsa = new InetSocketAddress(PORT_NUMBER);
-    int numHandler = 10;
-    int metaHandlerCount = 10;
-    boolean verbose = true;
-    this.rpcServer = HBaseRPC.getServer(this,
-        new Class<?>[]{
-            HBaseRPCErrorHandler.class
-        },
-        initialIsa.getHostName(), // BindAddress is IP we got for this server.
-        initialIsa.getPort(),
-        numHandler,
-        metaHandlerCount,
-        verbose,
-        c,
-        HConstants.QOS_THRESHOLD);
-    if (rpcServer instanceof HBaseServer) server = (HBaseServer) rpcServer;
-
-    this.rpcServer.setErrorHandler(this);
-    this.rpcEngine = HBaseRPC.getProtocolEngine(c);
-    this.rpcServer.start();
+    numHandler = 10;
+    metaHandlerCount = 10;
+    verbose = true;
+    c = HBaseConfiguration.create();
   }
 
-  /**
-   * Timing mechanism of the thread that determines when a parse operation is supposed to run. Waits for the predefined
-   * interval until a new run is performed. The method checks every 1000ms if it should be parsing again. The first run is
-   * done immediately once the thread is started.
-   */
   @Override
   public void run() {
-    Stat stat = new Stat();
-    byte[] hostnameBytes = Bytes.toBytes(hostname);
-    byte[] hostnameLengthBytes = Bytes.toBytes(new Long(hostname.length()));
-    UUID uuid = UUID.randomUUID();
-    byte[] uuidBytes = Bytes.toBytes(uuid.toString());
-
     try {
-      stat = this.zooKeeper.exists("/hbase.o", false);
+      zooKeeper = new ZooKeeper(ZK_CONNECT_STRING, 300, this);
+      RpcServer rpcServer = HBaseRPC.getServer(this,
+          new Class<?>[]{
+              HBaseRPCErrorHandler.class
+          },
+          initialIsa.getHostName(), // BindAddress is IP we got for this server.
+          initialIsa.getPort(),
+          numHandler,
+          metaHandlerCount,
+          verbose,
+          c,
+          HConstants.QOS_THRESHOLD);
+      rpcServer.setErrorHandler(this);
+      if (rpcServer instanceof HBaseServer) server = (HBaseServer) rpcServer;
+      RpcEngine rpcEngine = HBaseRPC.getProtocolEngine(c);
+      rpcServer.start();
+      UUID uuid = UUID.randomUUID();
+      byte[] uuidBytes = Bytes.toBytes(uuid.toString());
+      Stat stat = this.zooKeeper.exists(ZK_ROOT, false);
       if (stat == null) {
-
-        this.zooKeeper.create("/hbase.o", new byte[0],
+        this.zooKeeper.create(ZK_ROOT, new byte[0],
             ZooDefs.Ids.OPEN_ACL_UNSAFE,
             CreateMode.PERSISTENT);
 
-        this.zooKeeper.create("/hbase.o/hbaseid",
+        this.zooKeeper.create(ZK_ROOT + "/" + HBASE_ID,
             uuidBytes,
             ZooDefs.Ids.OPEN_ACL_UNSAFE,
             CreateMode.PERSISTENT);
-        this.zooKeeper.create("/hbase.o/rs",
+        this.zooKeeper.create(ZK_ROOT + "/" + RS + "/",
             new byte[0],
             ZooDefs.Ids.OPEN_ACL_UNSAFE,
             CreateMode.PERSISTENT);
-        this.zooKeeper.create("/hbase.o/rs/" + hostname + ","
+        this.zooKeeper.create(ZK_ROOT + "/" + RS  +"/" + hostname + ","
             + PORT_NUMBER
-            + ",1374084687099",
+            + "," + MAGIC_ID,
             new byte[0],
             ZooDefs.Ids.OPEN_ACL_UNSAFE,
             CreateMode.PERSISTENT);
+        c = HBaseConfiguration.create();
 
-
-        byte[] data = this.zooKeeper.getData("/hbase/hbaseid", false, stat);
-        byte[] data2 = this.zooKeeper.getData("/hbase.o/hbaseid", false, stat);
+        rpcServer.start();
       }
-    } catch (KeeperException e) {
-      e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
     } catch (InterruptedException e) {
       e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
+    } catch (KeeperException e) {
+      e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
+    } catch (IOException e) {
+      e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
     }
-
-    this.logger.info("HBase Import Thread has started");
-    long lastRun = 0;
-    while (!this.stopThread) {
-      if (lastRun + this.river.getInterval() < System.currentTimeMillis()) {
-        lastRun = System.currentTimeMillis();
-        try {
-          this.indexCounter = 0;
-        } catch (Throwable t) {
-          this.logger.error("An exception has been caught while parsing data from HBase", t);
-        }
-        if (!this.stopThread) {
-          this.logger.info("HBase Import Thread is waiting for {} Seconds until the next run", this.river.getInterval() / 1000);
-        }
-      }
-      try {
-        Thread.sleep(1000);
-      } catch (InterruptedException e) {
-        this.logger.trace("HBase river parsing thread has been interrupted");
-      }
-    }
-    this.logger.info("HBase Import Thread has finished");
-  }
-
-
-  /**
-   * Checks if there is an open Scanner or Client and closes them.
-   */
-  public synchronized void stopThread() {
-    this.stopThread = true;
   }
 
   @Override

@@ -111,7 +111,7 @@ class HBaseParser extends UnimplementedInHRegionShim
             new byte[0],
             ZooDefs.Ids.OPEN_ACL_UNSAFE,
             CreateMode.PERSISTENT);
-        this.zooKeeper.create(ZK_ROOT + "/" + RS  +"/" + hostname + ","
+        this.zooKeeper.create(ZK_ROOT + "/" + RS + "/" + hostname + ","
             + PORT_NUMBER
             + "," + MAGIC_ID,
             new byte[0],

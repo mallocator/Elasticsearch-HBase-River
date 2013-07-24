@@ -47,7 +47,7 @@ public class UnimplementedInHRegionShim {
 
 
   public CatalogTracker getCatalogTracker() {
-throw new RuntimeException("Not implemented");
+    throw new RuntimeException("Not implemented");
   }
 
 

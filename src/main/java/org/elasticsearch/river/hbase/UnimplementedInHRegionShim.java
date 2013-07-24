@@ -36,13 +36,6 @@ import java.io.IOException;
 import java.net.ConnectException;
 import java.util.List;
 
-/**
- * Created with IntelliJ IDEA.
- * User: alex
- * Date: 7/22/13
- * Time: 4:03 PM
- * To change this template use File | Settings | File Templates.
- */
 public class UnimplementedInHRegionShim {
 
 

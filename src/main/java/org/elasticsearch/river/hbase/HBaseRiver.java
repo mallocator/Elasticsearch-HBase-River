@@ -31,8 +31,6 @@ import java.util.UUID;
 
 /**
  * An HBase import river built similar to the MySQL river, that was modeled after the Solr SQL import functionality.
- *
- * @author Ravi Gairola
  */
 public class HBaseRiver extends AbstractRiverComponent implements River, UncaughtExceptionHandler {
 

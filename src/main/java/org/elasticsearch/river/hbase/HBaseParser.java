@@ -28,9 +28,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * A separate Thread that does the actual fetching and storing of data from an HBase cluster.
- *
- * @author Ravi Gairola
+ * A separate Thread that provides a replication sink and stores that data
+ * from an HBase cluster.
  */
 class HBaseParser extends UnimplementedInHRegionShim
     implements Watcher,

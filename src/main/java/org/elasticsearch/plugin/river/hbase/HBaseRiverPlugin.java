@@ -8,8 +8,6 @@ import org.elasticsearch.river.hbase.HBaseRiverModule;
 /**
  * Basic plug in information required by ElasticSearch. This class is also referenced under
  * /src/main/resources/es-plugin.properties.
- *
- * @author Ravi Gairola
  */
 public class HBaseRiverPlugin extends AbstractPlugin {
 

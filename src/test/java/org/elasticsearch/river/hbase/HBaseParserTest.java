@@ -23,6 +23,9 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 
 public class HBaseParserTest {
+
+  public static final int TEST_PORT_NUMBER = 8080;
+
   @AfterClass
   public void tearDown() {
     Mockit.tearDownMocks();
@@ -63,7 +66,7 @@ public class HBaseParserTest {
       this.normalize = false;
 
       final Map<String, Object> result = new HashMap<String, Object>();
-      final HBaseParser parser = new HBaseParser(new HBaseRiver(null, null, null));
+      final HBaseParser parser = new HBaseParser(new HBaseRiver(null, null, null), TEST_PORT_NUMBER);
       parser.readQualifierStructure(result, "data::set1::category1", "test1");
       parser.readQualifierStructure(result, "data::set1::category2", "test2");
       parser.readQualifierStructure(result, "data::set1::category3", "test3");
@@ -83,7 +86,7 @@ public class HBaseParserTest {
       this.normalize = false;
 
       final Map<String, Object> result = new HashMap<String, Object>();
-      final HBaseParser parser = new HBaseParser(new HBaseRiver(null, null, null));
+      final HBaseParser parser = new HBaseParser(new HBaseRiver(null, null, null), TEST_PORT_NUMBER);
       parser.readQualifierStructure(result, "data::set1::category1", "test1");
       parser.readQualifierStructure(result, "data::set1::category2", "test2");
       parser.readQualifierStructure(result, "data::set1::category3", "test3");
@@ -103,7 +106,7 @@ public class HBaseParserTest {
       this.normalize = false;
 
       final Map<String, Object> result = new HashMap<String, Object>();
-      final HBaseParser parser = new HBaseParser(new HBaseRiver(null, null, null));
+      final HBaseParser parser = new HBaseParser(new HBaseRiver(null, null, null), TEST_PORT_NUMBER);
       parser.readQualifierStructure(result, "data::set1::category1", "test1");
       parser.readQualifierStructure(result, "data::set1::category2", "test2");
       parser.readQualifierStructure(result, "data::set1::category3", "test3");
@@ -124,7 +127,7 @@ public class HBaseParserTest {
       this.normalize = true;
 
       final Map<String, Object> result = new HashMap<String, Object>();
-      final HBaseParser parser = new HBaseParser(new HBaseRiver(null, null, null));
+      final HBaseParser parser = new HBaseParser(new HBaseRiver(null, null, null), TEST_PORT_NUMBER);
       parser.readQualifierStructure(result, "data::set1::category1", "test1");
       parser.readQualifierStructure(result, "data::set1::category2", "test2");
       parser.readQualifierStructure(result, "data::set1::category3", "test3");
@@ -145,7 +148,7 @@ public class HBaseParserTest {
       this.normalize = false;
 
       final Map<String, Object> result = new HashMap<String, Object>();
-      final HBaseParser parser = new HBaseParser(new HBaseRiver(null, null, null));
+      final HBaseParser parser = new HBaseParser(new HBaseRiver(null, null, null), TEST_PORT_NUMBER);
       parser.readQualifierStructure(result, "data::set1::category1", "test1");
       parser.readQualifierStructure(result, "data::set1::category2", "test2");
       parser.readQualifierStructure(result, "data::set1::category3", "test3");
@@ -194,7 +197,7 @@ public class HBaseParserTest {
     @Test
     @SuppressWarnings("unchecked")
     public void testBase() throws IOException {
-      final HBaseParser parser = new HBaseParser(new HBaseRiver(null, null, null));
+      final HBaseParser parser = new HBaseParser(new HBaseRiver(null, null, null), TEST_PORT_NUMBER);
 
       final ArrayList<KeyValue> input = new ArrayList<KeyValue>();
 
@@ -263,7 +266,7 @@ public class HBaseParserTest {
 
     @Test
     public void testBase() throws IOException {
-      final HBaseParser parser = new HBaseParser(new HBaseRiver(null, null, null));
+      final HBaseParser parser = new HBaseParser(new HBaseRiver(null, null, null), TEST_PORT_NUMBER);
       this.separator = "::";
 
       final Map<String, Object> dataTree = new HashMap<String, Object>();
@@ -276,7 +279,7 @@ public class HBaseParserTest {
 
     @Test
     public void testDotSeparator() throws IOException {
-      final HBaseParser parser = new HBaseParser(new HBaseRiver(null, null, null));
+      final HBaseParser parser = new HBaseParser(new HBaseRiver(null, null, null), TEST_PORT_NUMBER);
       this.separator = ".";
 
       final Map<String, Object> dataTree = new HashMap<String, Object>();

@@ -9,19 +9,12 @@ import org.apache.hadoop.hbase.ipc.HBaseRPCErrorHandler;
 import org.apache.hadoop.hbase.ipc.HBaseServer;
 import org.apache.hadoop.hbase.ipc.HRegionInterface;
 import org.apache.hadoop.hbase.ipc.ProtocolSignature;
-import org.apache.hadoop.hbase.ipc.RpcEngine;
 import org.apache.hadoop.hbase.ipc.RpcServer;
 import org.apache.hadoop.hbase.regionserver.RegionServerServices;
 import org.apache.hadoop.hbase.regionserver.wal.HLog;
-import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.zookeeper.ZooKeeperWatcher;
-import org.apache.zookeeper.CreateMode;
-import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
-import org.apache.zookeeper.ZooDefs;
-import org.apache.zookeeper.ZooKeeper;
-import org.apache.zookeeper.data.Stat;
 import org.elasticsearch.action.bulk.BulkRequestBuilder;
 import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.action.index.IndexRequestBuilder;
@@ -33,7 +26,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 /**
  * A separate Thread that does the actual fetching and storing of data from an HBase cluster.
@@ -48,17 +40,9 @@ class HBaseParser extends UnimplementedInHRegionShim
     RegionServerServices {
 
   private final InetSocketAddress initialIsa;
-  private final String ZK_CONNECT_STRING = "localhost:2181";
-  private final String ZK_ROOT = "/hbase.o";
-  private final String HBASE_ID = "hbaseid";
-  private final String MAGIC_ID = "1374084687099";
-  private final String RS = "rs";
   private HBaseServer server;
-  ZooKeeper zooKeeper;
   Configuration c;
 
-  final static int PORT_NUMBER = 8080;
-  final static String hostname = "localhost";
   private final HBaseRiver river;
   private final ESLogger logger;
   private int indexCounter;
@@ -66,10 +50,10 @@ class HBaseParser extends UnimplementedInHRegionShim
   int metaHandlerCount;
   boolean verbose;
 
-  HBaseParser(final HBaseRiver river) {
+  HBaseParser(final HBaseRiver river, int port_number) {
     this.river = river;
     this.logger = river.getLogger();
-    initialIsa = new InetSocketAddress(PORT_NUMBER);
+    initialIsa = new InetSocketAddress(port_number);
     numHandler = 10;
     metaHandlerCount = 10;
     verbose = true;
@@ -79,7 +63,7 @@ class HBaseParser extends UnimplementedInHRegionShim
   @Override
   public void run() {
     try {
-      zooKeeper = new ZooKeeper(ZK_CONNECT_STRING, 300, this);
+      c = HBaseConfiguration.create();
       RpcServer rpcServer = HBaseRPC.getServer(this,
           new Class<?>[]{
               HBaseRPCErrorHandler.class
@@ -93,38 +77,7 @@ class HBaseParser extends UnimplementedInHRegionShim
           HConstants.QOS_THRESHOLD);
       rpcServer.setErrorHandler(this);
       if (rpcServer instanceof HBaseServer) server = (HBaseServer) rpcServer;
-      RpcEngine rpcEngine = HBaseRPC.getProtocolEngine(c);
       rpcServer.start();
-      UUID uuid = UUID.randomUUID();
-      byte[] uuidBytes = Bytes.toBytes(uuid.toString());
-      Stat stat = this.zooKeeper.exists(ZK_ROOT, false);
-      if (stat == null) {
-        this.zooKeeper.create(ZK_ROOT, new byte[0],
-            ZooDefs.Ids.OPEN_ACL_UNSAFE,
-            CreateMode.PERSISTENT);
-
-        this.zooKeeper.create(ZK_ROOT + "/" + HBASE_ID,
-            uuidBytes,
-            ZooDefs.Ids.OPEN_ACL_UNSAFE,
-            CreateMode.PERSISTENT);
-        this.zooKeeper.create(ZK_ROOT + "/" + RS + "/",
-            new byte[0],
-            ZooDefs.Ids.OPEN_ACL_UNSAFE,
-            CreateMode.PERSISTENT);
-        this.zooKeeper.create(ZK_ROOT + "/" + RS + "/" + hostname + ","
-            + PORT_NUMBER
-            + "," + MAGIC_ID,
-            new byte[0],
-            ZooDefs.Ids.OPEN_ACL_UNSAFE,
-            CreateMode.PERSISTENT);
-        c = HBaseConfiguration.create();
-
-        rpcServer.start();
-      }
-    } catch (InterruptedException e) {
-      e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
-    } catch (KeeperException e) {
-      e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
     } catch (IOException e) {
       e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
     }

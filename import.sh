@@ -6,8 +6,11 @@ JSON=$(cat <<EOF
     "hbase":{
     	"index":"elasticSearchIndexName",
         "type":"elasticSearchTypeName",
-        "hosts":"localhost:2180",
-        "table":"t1",
+	"host":"localhost",
+	"port":"8080",
+        "zhosts":"localhost:2181",
+        "znode": "/elasticsearch_sink",
+        "table":"table",
         "batchSize":1000,
         "idField":"PrimaryKeyFieldName",
         "interval":"60000"

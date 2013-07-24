@@ -1,5 +1,12 @@
 package org.elasticsearch.river.hbase;
 
+import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.zookeeper.CreateMode;
+import org.apache.zookeeper.KeeperException;
+import org.apache.zookeeper.Watcher;
+import org.apache.zookeeper.ZooDefs;
+import org.apache.zookeeper.ZooKeeper;
+import org.apache.zookeeper.data.Stat;
 import org.elasticsearch.ElasticSearchException;
 import org.elasticsearch.ExceptionsHelper;
 import org.elasticsearch.action.admin.indices.status.ShardStatus;
@@ -15,10 +22,12 @@ import org.elasticsearch.river.River;
 import org.elasticsearch.river.RiverName;
 import org.elasticsearch.river.RiverSettings;
 
+import java.io.IOException;
 import java.lang.Thread.UncaughtExceptionHandler;
 import java.nio.charset.Charset;
 import java.security.InvalidParameterException;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * An HBase import river built similar to the MySQL river, that was modeled after the Solr SQL import functionality.
@@ -26,14 +35,16 @@ import java.util.Map;
  * @author Ravi Gairola
  */
 public class HBaseRiver extends AbstractRiverComponent implements River, UncaughtExceptionHandler {
+
+
   private static final String CONFIG_SPACE = "hbase";
   private final Client esClient;
   private volatile Runnable parser;
 
   /**
-   * Comma separated list of Zookeeper hosts to which the HBase client can connect to find the cluster.
+   * Comma separated list of Zookeeper host to which the HBase client can connect to find the cluster.
    */
-  private final String hosts;
+  private final String host;
 
   /**
    * The HBase table name to be imported from.
@@ -125,6 +136,9 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
    * Setting if old entries that have just been read from HBase should be deleted after they've been read.
    */
   private final boolean deleteOld;
+  private String znode;
+  private String zhosts;
+  private int port;
 
   /**
    * Loads and verifies all the configuration needed to run this river.
@@ -140,8 +154,11 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
     this.logger.info("Creating HBase Stream River");
 
     this.normalizeFields = Boolean.parseBoolean(readConfig("normalizeFields", "true"));
-    this.hosts = readConfig("hosts");
+    this.host = readConfig("host");
+    this.port = Integer.parseInt(readConfig("port"));
+    this.znode = readConfig("znode");
     this.table = readConfig("table");
+    this.zhosts = readConfig("zhosts");
     this.columnSeparator = readConfig("columnSeparator", null);
     this.idField = normalizeField(readConfig("idField", null));
     this.index = normalizeField(readConfig("index", riverName.name()));
@@ -204,13 +221,56 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
    */
   @Override
   public synchronized void start() {
+    this.logger.info("Starting hbase river");
+
     if (this.parser != null) {
       this.logger.warn("Trying to start HBase stream although it is already running");
       return;
     }
-    this.parser = new HBaseParser(this);
+    this.parser = new HBaseParser(this, getPort());
     this.logger.info("Waiting for Index to be ready for interaction");
     waitForESReady();
+
+    try {
+      ZooKeeper zooKeeper = new ZooKeeper(getZHosts(),
+          300,
+          (Watcher) this.parser);
+      Stat stat = zooKeeper.exists(getZNode(), false);
+      UUID uuid = UUID.randomUUID();
+      String HBASE_ID = "hbaseid";
+      String RS = "rs";
+      String MAGIC_ID = "1374084687099";
+
+      byte[] uuidBytes = Bytes.toBytes(uuid.toString());
+
+      if (stat == null) {
+        zooKeeper.create(getZNode(), new byte[0],
+            ZooDefs.Ids.OPEN_ACL_UNSAFE,
+            CreateMode.PERSISTENT);
+
+        zooKeeper.create(getZNode() + "/" + HBASE_ID,
+            uuidBytes,
+            ZooDefs.Ids.OPEN_ACL_UNSAFE,
+            CreateMode.PERSISTENT);
+        zooKeeper.create(getZNode() + "/" + RS,
+            new byte[0],
+            ZooDefs.Ids.OPEN_ACL_UNSAFE,
+            CreateMode.PERSISTENT);
+        zooKeeper.create(getZNode() + "/" + RS + "/" + getHost() + ","
+            + getPort()
+            + "," + MAGIC_ID,
+            new byte[0],
+            ZooDefs.Ids.OPEN_ACL_UNSAFE,
+            CreateMode.PERSISTENT);
+      }
+    } catch (IOException e) {
+      logger.error(e.getMessage());
+    } catch (InterruptedException e) {
+      logger.error(e.getMessage());
+    } catch (KeeperException e) {
+      logger.error(e.getMessage());
+    }
+
 
     this.logger.info("Starting HBase Stream");
     String mapping;
@@ -329,8 +389,16 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
     return this.table;
   }
 
-  public String getHosts() {
-    return this.hosts;
+  public String getHost() {
+    return this.host;
+  }
+
+  public String getZHosts() {
+    return this.zhosts;
+  }
+
+  public String getZNode() {
+    return this.znode;
   }
 
   public byte[] getFamily() {
@@ -376,4 +444,9 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
   public boolean getDeleteOld() {
     return this.deleteOld;
   }
+
+  public int getPort() {
+    return port;
+  }
+
 }

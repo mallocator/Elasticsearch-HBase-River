@@ -19,7 +19,9 @@
       <useProjectArtifact>true</useProjectArtifact>
       <useTransitiveFiltering>true</useTransitiveFiltering>
       <includes>
-        <include>org.hbase:asynchbase</include>
+        <include>org.apache.hbase:hbase</include>
+        <include>org.apache.hadoop:hadoop-core</include>
+
       </includes>
     </dependencySet>
   </dependencySets>

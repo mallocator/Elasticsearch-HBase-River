@@ -5,7 +5,7 @@
   <name>ElasticSearch HBase River</name>
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.elasticsearch</groupId>
-  <artifactId>rivers-hbase</artifactId>
+  <artifactId>elasticsearch-river-hbase</artifactId>
   <packaging>jar</packaging>
   <description>HBase River for ElasticSearch</description>
   <inceptionYear>2013</inceptionYear>
@@ -25,15 +25,6 @@
     <mavenCompilerPlugin>3.0</mavenCompilerPlugin>
     <version.maven.surefire>2.12</version.maven.surefire>
   </properties>
-
-  <scm>
-    <url>scm:git://github.com/mallocator/Elasticsearch-HBase-River.git</url>
-    <connection>scm:git://github.com/mallocator/Elasticsearch-HBase-River.git
-    </connection>
-    <developerConnection>
-      scm:git://github.com/mallocator/Elasticsearch-HBase-River.git
-    </developerConnection>
-  </scm>
 
   <dependencies>
     <dependency>
@@ -87,21 +78,6 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-jar-plugin</artifactId>
         <version>${mavenJarPluginVersion}</version>
-        <configuration>
-          <archive>
-            <manifest>
-              <addDefaultImplementationEntries>true
-              </addDefaultImplementationEntries>
-            </manifest>
-            <manifestEntries>
-              <Implementation-Vendor-Component>${project.artifactId}
-              </Implementation-Vendor-Component>
-              <Implementation-Build-Date>${maven.build.timestamp}
-              </Implementation-Build-Date>
-              <SVN-Build>${buildNumber}</SVN-Build>
-            </manifestEntries>
-          </archive>
-        </configuration>
       </plugin>
       <plugin>
         <artifactId>maven-assembly-plugin</artifactId>
@@ -148,7 +124,6 @@
         <configuration>
           <failOnError>false</failOnError>
           <findbugsXmlOutput>true</findbugsXmlOutput>
-          <findbugsXmlWithMessages>true</findbugsXmlWithMessages>
           <excludeFilterFile>${basedir}/findbugs_exclude.xml</excludeFilterFile>
           <xmlOutput>true</xmlOutput>
         </configuration>

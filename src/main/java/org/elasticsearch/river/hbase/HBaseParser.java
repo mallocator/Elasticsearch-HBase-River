@@ -78,7 +78,7 @@ class HBaseParser extends UnimplementedInHRegionShim
       if (rpcServer instanceof HBaseServer) server = (HBaseServer) rpcServer;
       rpcServer.start();
     } catch (IOException e) {
-      e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
+      this.logger.error("Unable to start RPCServer");
     }
   }
 
@@ -147,7 +147,6 @@ class HBaseParser extends UnimplementedInHRegionShim
 
 
   public void replicateLogEntries(HLog.Entry[] entries) throws IOException {
-    this.logger.info("fooo");
     final BulkRequestBuilder bulkRequest = this.river.getEsClient().prepareBulk();
 
     for (HLog.Entry entry : entries) {
@@ -182,8 +181,8 @@ class HBaseParser extends UnimplementedInHRegionShim
    * Generate a tree structure that ElasticSearch can read and index from one of the rows that has been returned from
    * HBase.
    *
-   * @param row
-   * @return
+   * @param row The row in which to generate tree data
+   * @return a map representation of the HBase row
    */
   protected Map<String, Object> readDataTree(final List<KeyValue> row) {
     final Map<String, Object> dataTree = new HashMap<String, Object>();

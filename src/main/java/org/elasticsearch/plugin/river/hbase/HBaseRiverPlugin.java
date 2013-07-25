@@ -28,8 +28,9 @@ public class HBaseRiverPlugin extends AbstractPlugin {
   /**
    * Registers the HBaseRiverModule as "hbase" river.
    *
-   * @param module
+   * @param module the module to register the river with
    */
+  @SuppressWarnings("unused")
   public void onModule(final RiversModule module) {
     module.registerRiver("hbase", HBaseRiverModule.class);
   }

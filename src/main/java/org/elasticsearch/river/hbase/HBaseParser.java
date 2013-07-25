@@ -172,7 +172,7 @@ class HBaseParser extends UnimplementedInHRegionShim
     this.logger.info("HBase river has indexed {} entries so far", this.indexCounter);
     final List<byte[]> failedKeys = new ArrayList<byte[]>();
     if (response.hasFailures()) {
-      this.logger.error("Errors have occured while trying to index new data from HBase");
+      this.logger.error("Errors have occurred while trying to index new data from HBase");
       this.logger.debug("Failed keys are {}", failedKeys);
     }
   }

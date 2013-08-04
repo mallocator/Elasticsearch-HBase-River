@@ -154,12 +154,16 @@ class HBaseParser extends UnimplementedInHRegionShim
           river.
           getEsClient().
           prepareIndex(this.river.getIndex(), this.river.getType());
+
       List<KeyValue> kvs = entry.getEdit().getKeyValues();
-      if (kvs.size() > 0) {
-        final byte[] key = kvs.get(0).getRow();
-        Map<String, Object> dataTree = readDataTree(kvs);
+      for (KeyValue kv : kvs) {
+        final byte[] key = kv.getRow();
+        final ArrayList<KeyValue> tmp = new ArrayList<KeyValue>();
+        tmp.add(kv);
+        Map<String, Object> dataTree = readDataTree(tmp);
+
         request.setSource(dataTree);
-        request.setTimestamp(String.valueOf(kvs.get(0).getTimestamp()));
+        request.setTimestamp(String.valueOf(kv.getTimestamp()));
         if (this.river.getIdField() == null) {
           final String keyString = new String(key, this.river.getCharset());
           request.setId(keyString);

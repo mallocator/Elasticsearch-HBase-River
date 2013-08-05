@@ -13,18 +13,15 @@ import org.apache.hadoop.hbase.ipc.ProtocolSignature;
 import org.apache.hadoop.hbase.ipc.RpcServer;
 import org.apache.hadoop.hbase.regionserver.RegionServerServices;
 import org.apache.hadoop.hbase.regionserver.wal.HLog;
-import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.zookeeper.ZooKeeperWatcher;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
 import org.elasticsearch.action.bulk.BulkRequestBuilder;
 import org.elasticsearch.action.bulk.BulkResponse;
-import org.elasticsearch.action.delete.DeleteAction;
 import org.elasticsearch.action.delete.DeleteRequestBuilder;
 import org.elasticsearch.action.index.IndexRequestBuilder;
 import org.elasticsearch.common.Base64;
 import org.elasticsearch.common.logging.ESLogger;
-import org.jboss.netty.handler.codec.base64.Base64Encoder;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -160,7 +157,7 @@ class HBaseParser extends UnimplementedInHRegionShim
 
   private void replicateLogEntry(HLog.Entry entry) {
     final BulkRequestBuilder bulkRequest = this.river.getEsClient().prepareBulk();
-    for (KeyValue kv :  entry.getEdit().getKeyValues()) {
+    for (KeyValue kv : entry.getEdit().getKeyValues()) {
       final ESKey.Key key = ESKey
           .Key
           .newBuilder()
@@ -171,9 +168,9 @@ class HBaseParser extends UnimplementedInHRegionShim
       final String keyString = Base64.encodeBytes(key.toByteArray());
       if (kv.isDelete()) {
         final DeleteRequestBuilder request = this.
-          river.
-          getEsClient().
-          prepareDelete(this.river.getIndex(), this.river.getType(), keyString);
+            river.
+            getEsClient().
+            prepareDelete(this.river.getIndex(), this.river.getType(), keyString);
         bulkRequest.add(request);
       } else {
         final IndexRequestBuilder request = this.

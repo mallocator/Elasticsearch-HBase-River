@@ -246,7 +246,7 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
   }
 
   private void bootStrapZookeeper(final int attempt) {
-    if (attempt > MAX_TRIES){
+    if (attempt > MAX_TRIES) {
       return;
     }
     try {

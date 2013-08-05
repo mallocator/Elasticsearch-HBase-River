@@ -34,6 +34,7 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
 
 
   private static final String CONFIG_SPACE = "hbase";
+  private static final int MAX_TRIES = 10;
   private final Client esClient;
   private volatile Runnable parser;
 
@@ -201,7 +202,7 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
     this.parser = new HBaseParser(this, getPort());
     this.logger.info("Waiting for Index to be ready for interaction");
     waitForESReady();
-    bootStrapZookeeper();
+    bootStrapZookeeper(0);
 
     this.logger.info("Starting HBase Stream");
     String mapping = prepareCustomMapping();
@@ -244,7 +245,10 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
     return mapping;
   }
 
-  private void bootStrapZookeeper() {
+  private void bootStrapZookeeper(final int attempt) {
+    if (attempt > MAX_TRIES){
+      return;
+    }
     try {
       ZooKeeper zooKeeper = new ZooKeeper(getZHosts(),
           300,
@@ -282,6 +286,7 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
     } catch (InterruptedException e) {
       logger.error(e.getMessage());
     } catch (KeeperException e) {
+      bootStrapZookeeper(attempt + 1);
       logger.error(e.getMessage());
     }
   }

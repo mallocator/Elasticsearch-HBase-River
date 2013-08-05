@@ -1,5 +1,6 @@
 package org.elasticsearch.river.hbase;
 
+import com.google.protobuf.ByteString;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HConstants;
@@ -12,17 +13,23 @@ import org.apache.hadoop.hbase.ipc.ProtocolSignature;
 import org.apache.hadoop.hbase.ipc.RpcServer;
 import org.apache.hadoop.hbase.regionserver.RegionServerServices;
 import org.apache.hadoop.hbase.regionserver.wal.HLog;
+import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.zookeeper.ZooKeeperWatcher;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
 import org.elasticsearch.action.bulk.BulkRequestBuilder;
 import org.elasticsearch.action.bulk.BulkResponse;
+import org.elasticsearch.action.delete.DeleteAction;
+import org.elasticsearch.action.delete.DeleteRequestBuilder;
 import org.elasticsearch.action.index.IndexRequestBuilder;
+import org.elasticsearch.common.Base64;
 import org.elasticsearch.common.logging.ESLogger;
+import org.jboss.netty.handler.codec.base64.Base64Encoder;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -145,29 +152,36 @@ class HBaseParser extends UnimplementedInHRegionShim
     throw new RuntimeException("Not implemented");
   }
 
-
   public void replicateLogEntries(HLog.Entry[] entries) throws IOException {
-    final BulkRequestBuilder bulkRequest = this.river.getEsClient().prepareBulk();
-
     for (HLog.Entry entry : entries) {
-      final IndexRequestBuilder request = this.
+      replicateLogEntry(entry);
+    }
+  }
+
+  private void replicateLogEntry(HLog.Entry entry) {
+    final BulkRequestBuilder bulkRequest = this.river.getEsClient().prepareBulk();
+    for (KeyValue kv :  entry.getEdit().getKeyValues()) {
+      final ESKey.Key key = ESKey
+          .Key
+          .newBuilder()
+          .setRow(ByteString.copyFrom(kv.getRow()))
+          .setFamily(ByteString.copyFrom(kv.getFamily()))
+          .setColumn(ByteString.copyFrom(kv.getQualifier()))
+          .build();
+      final String keyString = Base64.encodeBytes(key.toByteArray());
+      if (kv.isDelete()) {
+        final DeleteRequestBuilder request = this.
           river.
           getEsClient().
-          prepareIndex(this.river.getIndex(), this.river.getType());
-
-      List<KeyValue> kvs = entry.getEdit().getKeyValues();
-      for (KeyValue kv : kvs) {
-        final byte[] key = kv.getRow();
-        final ArrayList<KeyValue> tmp = new ArrayList<KeyValue>();
-        tmp.add(kv);
-        Map<String, Object> dataTree = readDataTree(tmp);
-
-        request.setSource(dataTree);
+          prepareDelete(this.river.getIndex(), this.river.getType(), keyString);
+        bulkRequest.add(request);
+      } else {
+        final IndexRequestBuilder request = this.
+            river.
+            getEsClient().
+            prepareIndex(this.river.getIndex(), this.river.getType(), keyString);
+        request.setSource(readDataTree(Arrays.asList(kv)));
         request.setTimestamp(String.valueOf(kv.getTimestamp()));
-        if (this.river.getIdField() == null) {
-          final String keyString = new String(key, this.river.getCharset());
-          request.setId(keyString);
-        }
         bulkRequest.add(request);
       }
     }

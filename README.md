@@ -2,7 +2,7 @@ Elasticsearch-HBase-River
 ==========================
 
 This is a fork of the Elasticsearch-HBase-River. It was tested using elastic
-search 337805d396326de8a2153b04a7d6e8e422677439 (0.93-SNAPSHOT).
+search aad544d296759d4266f5764bc547012a3a1ba67d (0.94-SNAPSHOT).
 https://github.com/mallocator/Elasticsearch-HBase-River
 This one is slightly different in that it uses replication feature already in 
 HBase. http://hbase.apache.org/replication.html. The plugin updates HBase's

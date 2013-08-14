@@ -13,7 +13,7 @@
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <elasticsearch.version>0.90.3-SNAPSHOT</elasticsearch.version>
+    <elasticsearch.version>0.90.4-SNAPSHOT</elasticsearch.version>
 
     <version.testng>6.8</version.testng>
     <version.jmockit>0.999.19</version.jmockit>

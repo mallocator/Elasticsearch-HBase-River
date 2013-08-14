@@ -2,15 +2,8 @@ package org.elasticsearch.river.hbase;
 
 import com.google.protobuf.ByteString;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.HBaseConfiguration;
-import org.apache.hadoop.hbase.HConstants;
-import org.apache.hadoop.hbase.KeyValue;
-import org.apache.hadoop.hbase.ipc.HBaseRPC;
-import org.apache.hadoop.hbase.ipc.HBaseRPCErrorHandler;
-import org.apache.hadoop.hbase.ipc.HBaseServer;
-import org.apache.hadoop.hbase.ipc.HRegionInterface;
-import org.apache.hadoop.hbase.ipc.ProtocolSignature;
-import org.apache.hadoop.hbase.ipc.RpcServer;
+import org.apache.hadoop.hbase.*;
+import org.apache.hadoop.hbase.ipc.*;
 import org.apache.hadoop.hbase.regionserver.RegionServerServices;
 import org.apache.hadoop.hbase.regionserver.wal.HLog;
 import org.apache.hadoop.hbase.zookeeper.ZooKeeperWatcher;
@@ -43,6 +36,7 @@ class HBaseParser extends UnimplementedInHRegionShim
     RegionServerServices {
 
   private final InetSocketAddress initialIsa;
+  private final int port_number;
   private HBaseServer server;
   Configuration c;
 
@@ -61,6 +55,7 @@ class HBaseParser extends UnimplementedInHRegionShim
     metaHandlerCount = 10;
     verbose = true;
     c = HBaseConfiguration.create();
+    this.port_number = port_number;
   }
 
   @Override
@@ -253,5 +248,9 @@ class HBaseParser extends UnimplementedInHRegionShim
       return findKeyInDataTree((Map<String, Object>) dataTree.get(key), keyPath.substring(subKeyIndex));
     }
     return null;
+  }
+
+  public HServerInfo getHServerInfo() throws IOException {
+    return new HServerInfo(new HServerAddress(new InetSocketAddress(this.port_number)), 0, 0);
   }
 }

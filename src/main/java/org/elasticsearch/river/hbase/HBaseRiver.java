@@ -1,11 +1,7 @@
 package org.elasticsearch.river.hbase;
 
 import org.apache.hadoop.hbase.util.Bytes;
-import org.apache.zookeeper.CreateMode;
-import org.apache.zookeeper.KeeperException;
-import org.apache.zookeeper.Watcher;
-import org.apache.zookeeper.ZooDefs;
-import org.apache.zookeeper.ZooKeeper;
+import org.apache.zookeeper.*;
 import org.apache.zookeeper.data.Stat;
 import org.elasticsearch.ElasticSearchException;
 import org.elasticsearch.action.admin.indices.status.ShardStatus;
@@ -24,6 +20,7 @@ import java.io.IOException;
 import java.lang.Thread.UncaughtExceptionHandler;
 import java.nio.charset.Charset;
 import java.security.InvalidParameterException;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -245,10 +242,21 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
     return mapping;
   }
 
+  private void cleanupOldZookeeper(final ZooKeeper zk, String parent) throws KeeperException, InterruptedException {
+    getLogger().info("Cleaning up old zookeeper: " + parent);
+    List<String> children = zk.getChildren(parent, false);
+    for (String child : children) {
+      cleanupOldZookeeper(zk, parent + "/" + child);
+    }
+    Stat stat = zk.exists(parent, false);
+    zk.delete(parent, stat.getVersion());
+  }
+
   private void bootStrapZookeeper(final int attempt) {
     if (attempt > MAX_TRIES) {
       return;
     }
+
     try {
       ZooKeeper zooKeeper = new ZooKeeper(getZHosts(),
           300,
@@ -261,26 +269,33 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
 
       byte[] uuidBytes = Bytes.toBytes(uuid.toString());
 
-      if (stat == null) {
-        zooKeeper.create(getZNode(), new byte[0],
-            ZooDefs.Ids.OPEN_ACL_UNSAFE,
-            CreateMode.PERSISTENT);
-
-        zooKeeper.create(getZNode() + "/" + HBASE_ID,
-            uuidBytes,
-            ZooDefs.Ids.OPEN_ACL_UNSAFE,
-            CreateMode.PERSISTENT);
-        zooKeeper.create(getZNode() + "/" + RS,
-            new byte[0],
-            ZooDefs.Ids.OPEN_ACL_UNSAFE,
-            CreateMode.PERSISTENT);
-        zooKeeper.create(getZNode() + "/" + RS + "/" + getHost() + ","
-            + getPort()
-            + "," + MAGIC_ID,
-            new byte[0],
-            ZooDefs.Ids.OPEN_ACL_UNSAFE,
-            CreateMode.PERSISTENT);
+      String tmp_znode;
+      if (!getZNode().startsWith("/")) {
+        tmp_znode = "/" + getZNode();
+      } else {
+        tmp_znode = getZNode();
       }
+      if (stat != null) {
+        cleanupOldZookeeper(zooKeeper, tmp_znode);
+      }
+      zooKeeper.create(getZNode(), new byte[0],
+          ZooDefs.Ids.OPEN_ACL_UNSAFE,
+          CreateMode.PERSISTENT);
+
+      zooKeeper.create(getZNode() + "/" + HBASE_ID,
+          uuidBytes,
+          ZooDefs.Ids.OPEN_ACL_UNSAFE,
+          CreateMode.PERSISTENT);
+      zooKeeper.create(getZNode() + "/" + RS,
+          new byte[0],
+          ZooDefs.Ids.OPEN_ACL_UNSAFE,
+          CreateMode.PERSISTENT);
+      zooKeeper.create(getZNode() + "/" + RS + "/" + getHost() + ","
+          + getPort()
+          + "," + MAGIC_ID,
+          new byte[0],
+          ZooDefs.Ids.OPEN_ACL_UNSAFE,
+          CreateMode.PERSISTENT);
     } catch (IOException e) {
       logger.error(e.getMessage());
     } catch (InterruptedException e) {
@@ -410,5 +425,4 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
   public int getPort() {
     return port;
   }
-
 }

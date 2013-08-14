@@ -11,6 +11,7 @@ import org.elasticsearch.common.logging.ESLogger;
 import org.elasticsearch.common.util.concurrent.EsExecutors;
 import org.elasticsearch.common.xcontent.support.XContentMapValues;
 import org.elasticsearch.index.shard.IndexShardState;
+import org.elasticsearch.indices.IndexAlreadyExistsException;
 import org.elasticsearch.river.AbstractRiverComponent;
 import org.elasticsearch.river.River;
 import org.elasticsearch.river.RiverName;
@@ -202,9 +203,9 @@ public class HBaseRiver extends AbstractRiverComponent implements River, Uncaugh
     bootStrapZookeeper(0);
 
     this.logger.info("Starting HBase Stream");
-    String mapping = prepareCustomMapping();
-    this.logger.info("Created Index {} with _timestamp mapping for {}", this.index, this.type);
     try {
+      String mapping = prepareCustomMapping();
+      this.logger.info("Created Index {} with _timestamp mapping for {}", this.index, this.type);
       this.esClient.admin()
           .indices()
           .preparePutMapping(this.index)

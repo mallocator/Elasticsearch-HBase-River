@@ -3,6 +3,7 @@ package org.elasticsearch.river.hbase;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 
+import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -12,11 +13,11 @@ import mockit.Mock;
 import mockit.MockUp;
 import mockit.Mockit;
 
+import org.apache.hadoop.hbase.KeyValue;
 import org.elasticsearch.client.Client;
 import org.elasticsearch.river.AbstractRiverComponent;
 import org.elasticsearch.river.RiverName;
 import org.elasticsearch.river.RiverSettings;
-import org.hbase.async.KeyValue;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -189,7 +190,7 @@ public class HBaseParserTest {
 
 		@Test
 		@SuppressWarnings("unchecked")
-		public void testBase() {
+		public void testBase() throws IOException {
 			final HBaseParser parser = new HBaseParser(new HBaseRiver(null, null, null));
 
 			final ArrayList<KeyValue> input = new ArrayList<KeyValue>();
@@ -256,7 +257,7 @@ public class HBaseParserTest {
 		}
 
 		@Test
-		public void testBase() {
+		public void testBase() throws IOException {
 			final HBaseParser parser = new HBaseParser(new HBaseRiver(null, null, null));
 			this.separator = "::";
 
@@ -269,7 +270,7 @@ public class HBaseParserTest {
 		}
 
 		@Test
-		public void testDotSeparator() {
+		public void testDotSeparator() throws IOException {
 			final HBaseParser parser = new HBaseParser(new HBaseRiver(null, null, null));
 			this.separator = ".";
 

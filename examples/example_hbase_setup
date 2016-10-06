@@ -1,0 +1,9 @@
+add_peer '1', "localhost:2181:/elasticsearch_sink"
+
+create 'table', {NAME => 'c1', REPLICATION_SCOPE => 1}
+
+put 'table','r1','c1','v1'
+put 'table','r2','c1','v2'
+put 'table','r3','c1','v3'
+put 'table','r4','c1','v4'
+
